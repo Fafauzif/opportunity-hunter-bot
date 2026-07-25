@@ -248,15 +248,16 @@ class Config:
     @classmethod
     def load(cls) -> "Config":
         mode = os.getenv("RUN_MODE", "full").strip().lower()
-        if mode not in {"connections", "test", "dry-run", "full"}:
+        if mode not in {"connections", "test", "dry-run", "bootstrap", "full"}:
             raise ValueError(
-                "RUN_MODE must be connections, test, dry-run, or full."
+                "RUN_MODE must be connections, test, dry-run, bootstrap, or full."
             )
 
         defaults = {
             "connections": (1, 1, 1, 1, 1),
             "test": (2, 5, 8, 2, 8),
             "dry-run": (2, 5, 8, 2, 8),
+            "bootstrap": (32, 10, 200, 4, 50),
             "full": (16, 8, 60, 3, 30),
         }
         searches, results, pages, batch_size, gemini_calls = defaults[mode]
@@ -274,13 +275,13 @@ class Config:
                 "GEMINI_MODEL", "gemini-3.5-flash-lite"
             ),
             max_searches=env_int(
-                "MAX_SEARCHES_PER_RUN", searches, minimum=1, maximum=16
+                "MAX_SEARCHES_PER_RUN", searches, minimum=1, maximum=40
             ),
             results_per_search=env_int(
                 "RESULTS_PER_SEARCH", results, minimum=1, maximum=10
             ),
             max_content_pages=env_int(
-                "MAX_CONTENT_PAGES_PER_RUN", pages, minimum=1, maximum=100
+                "MAX_CONTENT_PAGES_PER_RUN", pages, minimum=1, maximum=250
             ),
             max_text_chars=env_int(
                 "MAX_TEXT_CHARS_PER_PAGE", 12000, minimum=2000, maximum=30000
@@ -1172,7 +1173,7 @@ CANDIDATES:
         if (
             send_summary
             and self.config.send_run_summary
-            and self.config.run_mode in {"test", "full"}
+            and self.config.run_mode in {"test", "bootstrap", "full"}
         ):
             try:
                 self.send_telegram(format_run_summary(self.stats, records))
@@ -1307,22 +1308,53 @@ def build_search_queries() -> list[str]:
         "undergraduate international students official"
     )
     return [
+        # Leadership and youth representation
         f"leadership development programs youth leaders {suffix}",
         f"youth ambassador programs student delegates {suffix}",
+        f"global youth leadership academy undergraduate {suffix}",
+        f"ASEAN youth leadership program Indonesian students {suffix}",
+
+        # Fellowships, exchanges, and short programs
         f"fully funded fellowships exchanges undergraduate students {suffix}",
         f"international summer schools short programs scholarships {suffix}",
+        f"student exchange cultural exchange funded program {suffix}",
+        f"emerging leaders fellowship university students {suffix}",
+
+        # Public policy, governance, and SDGs
         f"public policy governance youth fellowship summit {suffix}",
         f"SDG sustainable development youth program conference {suffix}",
+        f"climate policy social development youth opportunity {suffix}",
+        f"United Nations youth program policy students {suffix}",
+
+        # Essays, writing, policy memo, and research
         f"international essay writing competition university students {suffix}",
         f"policy memo research paper competition undergraduate {suffix}",
+        f"op-ed article writing competition students international {suffix}",
+        f"case study research competition undergraduate students {suffix}",
+
+        # Marketing, strategy, branding, and business cases
         f"marketing brand management competition university students {suffix}",
         f"business case strategy competition international undergraduates {suffix}",
+        f"consulting case competition university students {suffix}",
+        f"consumer marketing advertising challenge students {suffix}",
+
+        # Public speaking, pitching, and communication
         f"public speaking speech communication competition students {suffix}",
         f"pitching presentation competition university students {suffix}",
+        f"storytelling communication challenge young people {suffix}",
+        f"student conference speaker call for applications {suffix}",
+
+        # Entrepreneurship, social impact, and innovation
         f"entrepreneurship social impact challenge undergraduate {suffix}",
         f"innovation challenge non technical hackathon university students {suffix}",
+        f"social enterprise competition university students {suffix}",
+        f"startup idea challenge student founders international {suffix}",
+
+        # Summits, awards, grants, MUN, and broad discovery
         f"youth summit conference forum student delegates funding {suffix}",
-        f"student awards grants recognition programs and Model United Nations {suffix}",
+        f"student awards grants recognition programs {suffix}",
+        f"Model United Nations conference scholarship international students {suffix}",
+        f"obscure niche undergraduate opportunity fellowship competition {suffix}",
     ]
 
 
