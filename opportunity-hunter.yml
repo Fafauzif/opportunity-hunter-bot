@@ -1,0 +1,60 @@
+name: Opportunity Hunter Bot
+
+on:
+  schedule:
+    - cron: "7 8 * * *"
+      timezone: "Asia/Jakarta"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Choose how the bot should run"
+        required: true
+        default: "connections"
+        type: choice
+        options:
+          - connections
+          - test
+          - dry-run
+          - full
+
+permissions:
+  contents: read
+
+concurrency:
+  group: opportunity-hunter
+  cancel-in-progress: false
+
+jobs:
+  run:
+    name: Run Opportunity Hunter
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: python -m pip install --upgrade pip && pip install -r requirements.txt
+
+      - name: Run bot
+        env:
+          EXA_API_KEY: ${{ secrets.EXA_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          APPS_SCRIPT_WEBHOOK_URL: ${{ secrets.APPS_SCRIPT_WEBHOOK_URL }}
+          APPS_SCRIPT_WEBHOOK_SECRET: ${{ secrets.APPS_SCRIPT_WEBHOOK_SECRET }}
+          RUN_MODE: ${{ github.event_name == 'schedule' && 'full' || inputs.mode }}
+          USER_TIMEZONE: "Asia/Jakarta"
+          GEMINI_MODEL: "gemini-2.5-flash-lite"
+          LOG_LEVEL: "INFO"
+          SEND_RUN_SUMMARY: "true"
+          PYTHONUNBUFFERED: "1"
+        run: python main.py
