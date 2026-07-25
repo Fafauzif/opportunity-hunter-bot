@@ -271,7 +271,7 @@ class Config:
             run_mode=mode,
             timezone_name=os.getenv("USER_TIMEZONE", "Asia/Jakarta"),
             gemini_model=os.getenv(
-                "GEMINI_MODEL", "gemini-2.5-flash-lite"
+                "GEMINI_MODEL", "gemini-3.5-flash-lite"
             ),
             max_searches=env_int(
                 "MAX_SEARCHES_PER_RUN", searches, minimum=1, maximum=16
@@ -456,8 +456,7 @@ class OpportunityHunter:
             ),
             config={
                 "response_mime_type": "application/json",
-                "response_schema": test_schema,
-                "temperature": 0,
+                "response_json_schema": test_schema,
             },
         )
         parsed = parse_json_text(response.text or "")
@@ -741,8 +740,7 @@ CANDIDATES:
                     contents=prompt,
                     config={
                         "response_mime_type": "application/json",
-                        "response_schema": BATCH_SCHEMA,
-                        "temperature": 0.1,
+                        "response_json_schema": BATCH_SCHEMA,
                         "max_output_tokens": 12000,
                     },
                 )
