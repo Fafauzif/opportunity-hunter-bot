@@ -1,3 +1,2 @@
-exa-py>=1.0.0,<3.0.0
-google-genai>=1.0.0,<2.0.0
-requests>=2.31.0,<3.0.0
+# Opportunity Hunter v2 uses Python 3.11+ standard library only.
+# No pip dependencies are required.

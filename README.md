@@ -1,97 +1,52 @@
-# Opportunity Hunter Bot
+# Opportunity Hunter v2
 
-An automated Python bot that discovers undergraduate opportunities, analyzes
-eligibility and funding with Gemini, stores a broad database in Google Sheets,
-and sends selective Telegram priority alerts.
+Competition-first discovery with Exa, Gemini extraction, selective OpenRouter review, Google Sheets category views and Telegram alerts.
 
-## What it searches for
-
-- Leadership and youth ambassador programs
-- Fellowships, exchanges, summer schools, and short programs
-- Public policy, governance, development, and SDG opportunities
-- Essay, writing, policy memo, and research competitions
-- Marketing, branding, strategy, and business case competitions
-- Public speaking, pitching, presentation, and communication contests
-- Entrepreneurship and social-impact competitions
-- Innovation challenges and non-technical hackathons
-- Youth summits, conferences, forums, awards, grants, debate, and MUN
-
-## Required GitHub repository secrets
-
-- `EXA_API_KEY`
-- `GEMINI_API_KEY`
-- `TELEGRAM_BOT_TOKEN`
-- `TELEGRAM_CHAT_ID`
-- `APPS_SCRIPT_WEBHOOK_URL`
-- `APPS_SCRIPT_WEBHOOK_SECRET`
-
-## Beginner upload instructions
-
-1. Download and extract the project ZIP.
-2. Open your private GitHub repository.
-3. Select **Add file → Upload files**.
-4. Drag every extracted item into the upload area, including the `.github`
-   folder.
-5. Enter `Add Opportunity Hunter bot` as the commit message.
-6. Select **Commit changes**.
-
-The repository should contain:
-
-```text
-.github/workflows/opportunity-hunter.yml
-main.py
-requirements.txt
-README.md
-.env.example
-.gitignore
-apps_script.gs
-```
-
-## First run
-
-1. Open the repository's **Actions** tab.
-2. Select **Opportunity Hunter Bot**.
-3. Select **Run workflow**.
-4. Choose `connections`.
-5. Run it.
-
-A successful connection test sends a Telegram message confirming that Exa,
-Gemini, Google Sheets, and Telegram are connected.
-
-Then run `test`. This performs two real searches, analyzes a small number of
-pages, and writes real opportunity rows to Google Sheets.
-
-After the test succeeds, run `full` once manually. Scheduled runs then execute
-every day at 08:07 Asia/Jakarta time.
+**Installing over v1? Open [START-HERE.md](START-HERE.md).** Keep the existing repository, spreadsheet, script properties and deployment URL. Do not reimport the workbook or create a second Apps Script project.
 
 ## Run modes
 
-- `connections`: checks every integration with minimal API usage.
-- `test`: two searches and up to eight new content pages.
-- `dry-run`: analyzes a small sample without writing or sending messages.
-- `full`: sixteen searches and up to sixty new content pages.
+- `verify`: checks deployed Sheets schema, Exa, Gemini structured output, optional OpenRouter structured output and Telegram. Uses small real API requests; no opportunity inserts.
+- `test`: five competition-family searches, up to eight pages/eight extraction calls, and up to one selective strong review. Writes real results.
+- `dry-run`: small Exa/Gemini analysis preview without Sheets mutations, Telegram or strong-review requests. Retrieval/extraction usage may still be billed by your providers.
+- `full`: default 16 searches, up to 60 attempted content pages and 30 physical extraction attempts. Query rotation and queued work persist in Sheets.
+- `bootstrap`: 20 rotating searches with the same page/model caps. No unbounded import.
 
-## Cost controls
+The workflow runs daily at 08:07 WIB (01:07 UTC), subject to GitHub scheduling delays. `Settings.enabled=FALSE` pauses discovery. No local state files or Actions cache are required for queue/rotation/budget persistence.
 
-The full mode has hard caps:
+## Local tests
 
-- Maximum 16 Exa searches
-- Maximum 10 results per search
-- Maximum 60 full page content fetches
-- Maximum 30 Gemini calls
-- Maximum 12 Telegram priority alerts
+Python 3.11+; standard library only:
 
-Existing URLs are checked against Google Sheets before full page content is
-retrieved. This reduces repeat processing and Exa content charges.
+```sh
+python -m unittest discover -s tests -v
+node tests/apps_script_test.js
+```
 
-## Editing thresholds
+Node is needed only for offline Apps Script tests, not the deployed bot. The test emulator is not a substitute for native Sheets verification.
 
-Defaults are inside the GitHub workflow and `main.py`:
+## Project files
 
-- Telegram score threshold: 75
-- Application fee guideline: Rp300,000
-- Personal cost guideline: Rp1,000,000
-- Telegram alerts: moderate priority only
-- Google Sheets policy: broad database
+- `main.py`: entry point.
+- `bot_v2.py`: network integrations and pipeline orchestration.
+- `hunter_core.py`: pure scheduling, validation, identity, scoring and prompt rules.
+- `config.json`: non-secret defaults, model budget and rotating source queries.
+- `apps_script.gs`: complete Google Apps Script file to paste into the existing bot project.
+- `.github/workflows/main.yml`: the active scheduled workflow.
+- `opportunity-hunter.yml`: reference copy only; not an additional active workflow.
+- `START-HERE.md`: installation, daily use, troubleshooting and rollback.
+- `VALIDATION.md`: checks and limits.
 
-Do not put API keys directly into `main.py` or `.env.example`.
+## Data and navigation
+
+Nine-column category tabs draw from one background Opportunities table. Details presents full facts vertically. My Applications stores editable progress by stable opportunity ID. Queue, rotation cursor, notification claims and reviewer-cost reservations persist behind the scenes. Reused annual URLs can be revisited without permanently blocking new editions. Uncertain identity matches are kept separate rather than merged speculatively.
+
+The upgrade backs up the existing spreadsheet once, preserves its webhook secret, reconciles legacy IDs, and migrates meaningful manual progress. It is rerunnable. Category views are regenerated; edit personal progress only in My Applications.
+
+## Coverage and evidence
+
+Family-level search counts, processing outcomes, deadlines and review flags appear in run reports. The Benchmark tab is seeded with up to 20 already-saved competition references as a **presence check**, not an independent recall test. Add manually confirmed events that were missed to build a meaningful discovery benchmark. Monitoring benchmark URLs and general web discovery measure different things.
+
+Exa text retrieval can handle supported documents, but inaccessible/image-only pages may still need manual information or later OCR work. The pipeline fetches at most one linked supporting rules/application page per event under the shared page cap. Listings expand only source-supported links. Unavailable pages remain queued. No guarantee of internet-wide completeness is implied.
+
+Search-provider costs are recorded when returned; missing usage is not proof of zero cost. The $1 default budget covers this bot's OpenRouter reviewer only. Other model/search usage follows your account's tier and billing.

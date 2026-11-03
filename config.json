@@ -1,0 +1,24 @@
+{
+  "profile": {"nationality": "Indonesia", "education": "Current undergraduate", "age": null, "university": "", "university_country": "", "residence": "", "interests": "Business cases, marketing, essays, policy, pitching and innovation competitions"},
+  "include_programs": false,
+  "application_fee_limit_idr": 300000,
+  "personal_cost_guideline_idr": 1000000,
+  "telegram_score_threshold": 75,
+  "category_weights": {"Business Cases": 20, "Marketing": 20, "Essays & Policy": 20, "Pitch & Innovation": 18, "Speaking & Debate": 12, "Programs": 0},
+  "max_searches": 16,
+  "results_per_search": 8,
+  "max_content_pages": 60,
+  "max_gemini_calls": 30,
+  "max_alerts": 12,
+  "review_enabled": true,
+  "review_monthly_budget_usd": 1.0,
+  "review_max_per_run": 5,
+  "review_model": "google/gemini-3.6-flash",
+  "review_input_ceiling_per_million": 2.0,
+  "review_output_ceiling_per_million": 10.0,
+  "sources": [
+    {"family": "Business Cases", "query": "student case competition registration {year}", "domains": ["unstop.com/competitions"]},
+    {"family": "Pitch & Innovation", "query": "student social impact innovation competition {year}", "domains": ["devpost.com/hackathons"]},
+    {"family": "Essays & Policy", "query": "lomba esai mahasiswa pendaftaran {year}", "domains": ["*.ac.id"]}
+  ]
+}

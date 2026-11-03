@@ -1,0 +1,29 @@
+{
+  "version": "2.0.0",
+  "base_commit": "77f27b7e6052a83ba35cb4a5a56a94dca7dd6b81",
+  "built_date": "2026-11-03",
+  "files": {
+    ".github/workflows/main.yml": "c63f451c8450d55b4355aef608a9fc69a890daa965a2ec70b45f3c6ebbd61f79",
+    ".env.example": "02527039765938208f8dea19a71f7cd305ea2cc65e8421682cebe4702d8160f4",
+    ".gitignore": "a223ff677c61149d68ddbee5a02ddb213d8f417fcf5be6eff213d51c502a8755",
+    "main.py": "3a9846f15340c14f1d57268fd49554bfe482df85dd151da2d8e28b018920996f",
+    "bot_v2.py": "6106f446522ece06ef0084b0b400a5b2e2fa6b7b3392ab77128d9a80f47ca059",
+    "hunter_core.py": "437018c714cb9b6eee1389f0e6c8fc107efa171be7330e33be5dc7d98337c4c1",
+    "config.json": "99401e509fe655a19b2bee06dd1ceffdea3265db84d5b62619d4ec954c397d34",
+    "apps_script.gs": "8fcb867e97af4c91e5461c89d4a511f970d8b9478fb3822306fe9579da222a78",
+    "requirements.txt": "4f7e8660ea203aad5e2d54c86b07afb723ae939793dbcb52d3a3c30b935a822c",
+    "README.md": "81070e28a3f195690acadf109c4d7f3f809380a0ab1ac25594ea6d0d9329ac2d",
+    "START-HERE.md": "8a409fd31696cc419ddc5aec3537ac0a85985854b4b950a9f3dc6fe722a1b2df",
+    "VALIDATION.md": "aed096efd042fe16064c2227c1ef476b5f68102e9d92fc89bcdfeae107bad982",
+    "opportunity-hunter.yml": "909cd562cf23d1b7e80ac72e08fd66ab679c4f4ac09552fa1bd85797e31d42e4",
+    "tests/test_core.py": "26d22c6bba70ba910304ef0fc97b5d1b39b70ba21adae81e7acc4fc268c33930",
+    "tests/test_flow.py": "158462cc6f6b324d12bd1e65ce82b93bdc7294d5ea518223627ebb9aa99d613e",
+    "tests/apps_script_test.js": "a3fd1523cbd702657ab03ce36a002a698cf94e25bc211c2ff491535e10464e54"
+  },
+  "offline_tests": {
+    "python": 32,
+    "apps_script": 16,
+    "uploaded_opportunity_rows": 371
+  },
+  "live_deployment_tested": false
+}
