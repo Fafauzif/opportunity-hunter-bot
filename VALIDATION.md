@@ -4,7 +4,11 @@ Built from repository commit `77f27b7e6052a83ba35cb4a5a56a94dca7dd6b81` and the 
 
 ## Offline validation
 
-Result: **32 Python tests passed; 16 Apps Script emulator checks passed**, including a migration replay on all 371 uploaded opportunity records.
+v2.0.1 result: **34 Python tests passed; 18 Apps Script emulator checks passed**, plus **19 checks with the newly supplied XLSX snapshot**, including a migration replay on all 371 uploaded opportunity records.
+
+The 3 November export has 1,450 queue rows, all PENDING with zero attempts, and native date-formatted Next Check cells. Programs are disabled: 637 rows belong to enabled families and 813 to Programs. Replaying the old string comparison on the exported native dates selects zero enabled URLs. The normalized comparison finds all 637 due URLs and returns the first 250 under the existing endpoint cap. This is an offline replay, not a live Apps Script deployment check.
+
+Run Logs rows 111–112 show one bootstrap run (20 successful searches, 144 unique candidates) and one full run (16 successful searches, 118 unique candidates). Both have zero content attempts, pages fetched, extraction calls, inserts and updates. Existing opportunity records have no 3 November Run ID. The source workbook was read only.
 
 - Python unit/integration tests use fake provider responses and make no network requests.
 - Query scheduling tests cover every competition family and rotation across runs.
@@ -13,6 +17,7 @@ Result: **32 Python tests passed; 16 Apps Script emulator checks passed**, inclu
 - Cost tests cover registration/participation fees, free-application ambiguity, negation, unknown amounts and offline-final expenses.
 - Ranking tests ensure scholarships do not generate competition priority alerts and alerts are sorted before capping.
 - Pipeline tests check acknowledged persistence before alerts, failed saves, read-only dry runs and budgeted reviewer verification.
+- Queue regression tests cover native Date, serial and ISO cells; due revisits; retry cooldowns; disabled Programs; and summary counts. Pipeline diagnostics distinguish listing/non-event work from saved events and flag an inconsistent empty due response.
 - Apps Script emulation checks identity migration, repeat upgrades, backup behavior, category width, monthly reservations, same-URL new editions, idempotent saves and record lookup.
 - Migration was also exercised against all 371 uploaded opportunity records, with all record titles preserved and unique nonblank primary IDs after repair. The source XLSX was not modified.
 - No real API keys were used. Nothing was pushed to GitHub, deployed to Google, or sent to Telegram.

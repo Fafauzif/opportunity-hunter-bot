@@ -4,6 +4,14 @@ Competition-first discovery with Exa, Gemini extraction, selective OpenRouter re
 
 **Installing over v1? Open [START-HERE.md](START-HERE.md).** Keep the existing repository, spreadsheet, script properties and deployment URL. Do not reimport the workbook or create a second Apps Script project.
 
+## v2.0.1 queue date fix
+
+Native Sheets dates in `Bot Queue → Next Check` were compared using `String(date)` against an ISO date. That silently returned no due work while searches and connection verification still passed. Dates are now normalized before selection and sorting. The summary also excludes Programs when disabled, and reports processed event/listing/other pages plus due/waiting URL counts.
+
+For an existing v2 installation, update `bot_v2.py` and `hunter_core.py` in GitHub. Replace the existing Apps Script bot code with `apps_script.gs`, save, and edit the **existing deployment → New version → Deploy**. The `/exec` health response should report `version: 2.0.1`, `schema_version: 2`. No migration or queue reset is needed for this patch. Run `test`, then `full` after checking the report. Verification alone does not process the queue.
+
+`Saved / updated` counts acknowledged event-record inserts/updates, including records kept for review or closed/rejected history. `New competitions` counts newly inserted active competition records. `Pending source URLs` counts enabled-family URLs due now or unprocessed/retry URLs waiting for a future date. It does not count future revisits of completed rows. Listing pages may add child URLs without saving an event. Coverage counts successful search requests, not events saved. Full mode still caps content attempts at 60 and Gemini calls at 30; supporting pages consume those same limits, so a backlog takes multiple runs and may grow while discovery continues.
+
 ## Run modes
 
 - `verify`: checks deployed Sheets schema, Exa, Gemini structured output, optional OpenRouter structured output and Telegram. Uses small real API requests; no opportunity inserts.

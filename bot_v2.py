@@ -55,6 +55,8 @@ class Bot:
         self.stats = {"run_id": self.run_id, "started_at": self.now(), "searches_attempted": 0,
                       "searches_succeeded": 0, "candidates_found": 0, "candidates_deduplicated": 0,
                       "pages_fetched": 0, "content_attempts": 0, "gemini_calls": 0,
+                      "source_pages_processed": 0, "event_pages_processed": 0,
+                      "listing_pages_processed": 0, "other_pages_processed": 0,
                       "opportunities_inserted": 0, "opportunities_updated": 0, "rejected_logged": 0,
                       "telegram_alerts_sent": 0, "estimated_exa_cost_usd": 0,
                       "review_calls": 0, "errors": [], "coverage": {}, "benchmark": [], "mode": mode}
@@ -351,7 +353,9 @@ class Bot:
     def finish(self, send=True):
         self.stats["status"] = "SUCCESS_WITH_WARNINGS" if self.stats["errors"] else "SUCCESS"
         self.stats["finished_at"] = self.now()
-        self.stats["notes"] = json.dumps({"version": VERSION, "mode": self.mode, "coverage": self.stats["coverage"], "content_attempts": self.stats["content_attempts"], "review_calls": self.stats["review_calls"]})
+        self.stats["notes"] = json.dumps({"version": VERSION, "mode": self.mode, "coverage": self.stats["coverage"], "content_attempts": self.stats["content_attempts"], "review_calls": self.stats["review_calls"],
+                                         "processing": {k: self.stats[k] for k in ["source_pages_processed", "event_pages_processed", "listing_pages_processed", "other_pages_processed"]},
+                                         "queue": {k: self.stats[k] for k in ["due_candidates_returned", "queue_remaining", "queue_due_now", "queue_waiting"] if k in self.stats}})
         report = dict(self.stats)
         Path("run-report.json").write_text(json.dumps(report, indent=2, ensure_ascii=False))
         if self.mode != "dry-run":
@@ -359,7 +363,15 @@ class Bot:
             if send and self.mode not in {"verify", "connections"}:
                 lines = ["📋 <b>Opportunity Hunter v2</b>", "New competitions: " + str(self.stats.get("new_competitions", 0)),
                          "Saved / updated: " + str(self.stats["opportunities_inserted"]) + " / " + str(self.stats["opportunities_updated"]),
-                         "Queued: " + str(self.stats.get("queue_remaining", "?")), "Coverage:"]
+                         "Pending source URLs: " + str(self.stats.get("queue_remaining", "?")),
+                         "Source pages processed: " + str(self.stats["source_pages_processed"]) +
+                         " (events: " + str(self.stats["event_pages_processed"]) +
+                         ", listings: " + str(self.stats["listing_pages_processed"]) +
+                         ", other: " + str(self.stats["other_pages_processed"]) + ")",
+                         "Content fetch attempts / Gemini calls: " + str(self.stats["content_attempts"]) + " / " + str(self.stats["gemini_calls"])]
+                if "queue_due_now" in self.stats:
+                    lines += ["Due now / waiting until later: " + str(self.stats["queue_due_now"]) + " / " + str(self.stats.get("queue_waiting", "?"))]
+                lines += ["Coverage (search requests, not saved events):"]
                 lines += [html.escape(k) + ": " + str(v["succeeded"]) + "/" + str(v["attempted"]) + " searches" for k, v in self.stats["coverage"].items()]
                 lines += ["Strong reviews: " + str(self.stats["review_calls"]), "Warnings: " + str(len(self.stats["errors"])), "See Settings and Run Logs for checks."]
                 try:
@@ -397,6 +409,7 @@ class Bot:
         else:
             self.sheets("set_cursor", request_id=self.run_id, cursor=cursor + len(plan))
             pool = self.sheets("queue_due").get("items", [])
+        self.stats["due_candidates_returned"] = len(pool)
         self.remaining_pages = int(self.settings["max_content_pages"])
         # Supporting pages and queued discovery/refresh pages share one cap.
         selected, deferred = fair_select(pool, int(self.settings["max_content_pages"]))
@@ -425,6 +438,9 @@ class Bot:
                                 revisit_days=30 if not record or record.get("record_status") != "ACTIVE" else 3 if record.get("days_remaining", 999) != "" and record["days_remaining"] < 14 else 7)
                 coverage = self.stats["coverage"].setdefault(candidate.get("family", "Unknown"), {"attempted": 0, "succeeded": 0, "results": 0, "processed": 0})
                 coverage["processed"] += 1
+                self.stats["source_pages_processed"] += 1
+                outcome = "event_pages_processed" if record else "listing_pages_processed" if result.startswith("Listing") else "other_pages_processed"
+                self.stats[outcome] += 1
             except (RuntimeError, ValueError, KeyError, TypeError):
                 self.note("Candidate deferred after fetch, validation or save failure: " + candidate_id(candidate["url"]))
                 self.stats["queue_remaining"] += 1
@@ -435,6 +451,11 @@ class Bot:
             self.send_alerts(records)
             final = self.sheets("refresh_views")
             self.stats["queue_remaining"] = final.get("queue_remaining", self.stats["queue_remaining"])
+            for key in ["queue_due_now", "queue_waiting"]:
+                if key in final:
+                    self.stats[key] = final[key]
+            if not pool and final.get("queue_due_now", 0):
+                self.note("Due source URLs exist but none were returned; inspect Bot Queue dates and the deployed Apps Script version")
             self.stats["benchmark"] = final.get("benchmark", [])
         else:
             self.stats["preview"] = [{k: r.get(k) for k in ["title", "category", "alert_level", "review_reason"]} for r in records]

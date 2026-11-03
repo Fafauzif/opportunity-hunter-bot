@@ -112,10 +112,19 @@ if(snapshotArg>=0){
     for(const row of tab.rows)for(const [ref,raw]of Object.entries(row)){
       const m=ref.match(/^([A-Z]+)(\d+)$/),r=Number(m[2]),c=col(m[1]);s.cells[r-1]??=[];
       const header=s.cells[0]?.[c-1]||'';let value=raw;
-      if(r>1&&/^(Date Found|Last Seen|Opening Date|Start Date|End Date|Deadline Date|Last Bot Update|Started At|Finished At)$/.test(header)&&/^\d+(\.\d+)?$/.test(raw))value=new Date(Date.UTC(1899,11,30)+Number(raw)*86400000);
+      if(r>1&&/^(Date Found|Last Seen|Opening Date|Start Date|End Date|Deadline Date|Last Bot Update|Started At|Finished At|Next Check|Last Checked)$/.test(header)&&/^\d+(\.\d+)?$/.test(raw))value=new Date(Date.UTC(1899,11,30)+Number(raw)*86400000);
       s.cells[r-1][c-1]=value;
     }
   }
+  check('snapshot queue dates are eligible before migration or rewriting cells',()=>{
+    const rows=call('v2QueueRows_',workbook),today=call('v2Today_');
+    const expected=rows.filter(r=>call('v2ISO_',r['Next Check'])<=today).length;
+    const legacy=rows.filter(r=>String(r['Next Check']||'')<=today).length;
+    const due=call('v2Due_',workbook);
+    assert.equal(due.length,Math.min(expected,250));
+    assert.equal(call('v2QueueStatus_',workbook).queue_due_now,expected);
+    console.log(JSON.stringify({snapshot_queue_rows:call('v2Rows_',workbook.getSheetByName('Bot Queue')).length,enabled_queue_rows:rows.length,legacy_due_count:legacy,fixed_due_count:expected,returned_this_request:due.length}));
+  });
 }else{
   const h=evaluate('OPPORTUNITY_COLUMNS.map(c=>c[1])');
   const s=workbook.insertSheet('Opportunities');s.cells=[h];
@@ -126,6 +135,7 @@ const originalMain=workbook.getSheetByName('Opportunities'),beforeCount=original
 const originalTitles=call('v2Rows_',originalMain).map(r=>r.Title);
 check('full upgrade backs up before mutation and keeps webhook secret',()=>{
   call('upgradeOpportunityHunter');assert.equal(workbook.backups.length,1);assert.equal(props.WEBHOOK_SECRET,'test-webhook-secret');assert.equal(props.V2_SCHEMA,'2');
+  const health=JSON.parse(call('doGet').text);assert.equal(health.version,'2.0.1');assert.equal(health.schema_version,2);
 });
 check('all main records and titles preserved',()=>{
   assert.equal(originalMain.getLastRow()-1,beforeCount);assert.equal(JSON.stringify(call('v2Rows_',originalMain).map(r=>r.Title)),JSON.stringify(originalTitles));
@@ -179,5 +189,36 @@ check('notes stay attached to IDs after sorting category view',()=>{
   let id=s.notes['4,9'];
   if(s.getLastRow()>4){id=s.notes['5,9'];[s.cells[3],s.cells[4]]=[s.cells[4],s.cells[3]];[s.notes['4,9'],s.notes['5,9']]=[s.notes['5,9'],s.notes['4,9']];}
   s.selection=s.getRange(4,1);workbook.setActiveSheet(s);assert.equal(call('v2SelectedId_',workbook),id);
+});
+check('queue accepts native Sheets dates, serial dates and ISO text',()=>{
+  const queue=workbook.getSheetByName('Bot Queue'),saved=queue.cells;
+  const today=call('v2Today_'),native=new Date(today+'T00:00:00+07:00');
+  const serial=(Date.parse(today+'T00:00:00Z')-Date.UTC(1899,11,30))/86400000;
+  queue.cells=[evaluate('V2_QUEUE_HEADERS')];
+  try{
+    [native,serial,today,''].forEach((date,i)=>call('v2Append_',queue,{URL:'https://example.org/due-'+i,Family:'Business Cases',Kind:'discovery',State:'PENDING','Next Check':date}));
+    call('v2Append_',queue,{URL:'https://example.org/future',Family:'Business Cases',Kind:'discovery',State:'PENDING','Next Check':new Date('2099-01-01T00:00:00+07:00')});
+    call('v2Append_',queue,{URL:'https://example.org/program',Family:'Programs',Kind:'discovery',State:'PENDING','Next Check':native});
+    const urls=call('v2Due_',workbook).map(r=>r.url);
+    assert.equal(urls.length,4);for(let i=0;i<4;i++)assert(urls.includes('https://example.org/due-'+i));
+  }finally{queue.cells=saved;}
+});
+check('queue counts distinguish due work from retries and completed cooldowns',()=>{
+  const queue=workbook.getSheetByName('Bot Queue'),saved=queue.cells;
+  queue.cells=[evaluate('V2_QUEUE_HEADERS')];
+  try{
+    const today=call('v2Today_');
+    const add=(suffix,state,date,family='Business Cases')=>call('v2Append_',queue,{URL:'https://example.org/'+suffix,Family:family,Kind:'discovery',State:state,'Next Check':new Date(date+'T00:00:00+07:00')});
+    add('due-new','PENDING',today);add('due-revisit','DONE',today);
+    add('retry-later','RETRY','2099-01-01');add('new-later','PENDING','2099-01-01');
+    add('completed-later','DONE','2099-01-01');add('excluded-program','PENDING',today,'Programs');
+    const status=call('v2Refresh_',workbook);
+    assert.equal(status.queue_remaining,4);assert.equal(status.queue_due_now,2);assert.equal(status.queue_waiting,2);
+    const due=call('v2Due_',workbook);assert.equal(due.length,2);
+    assert.equal(due.find(r=>r.url.endsWith('/due-revisit')).kind,'refresh');
+    call('v2Dispatch_',workbook,{action:'queue_result',url:'https://example.org/due-new',outcome:'DONE',detail:'Event processed',revisit_days:7});
+    assert.equal(call('v2Due_',workbook).length,1);
+    const remaining=call('v2QueueStatus_',workbook);assert.equal(remaining.queue_due_now,1);assert.equal(remaining.queue_waiting,2);
+  }finally{queue.cells=saved;}
 });
 console.log(JSON.stringify({checks,original_opportunities:beforeCount,migration:'passed in offline emulator',native_google_ui:'not executed'}));

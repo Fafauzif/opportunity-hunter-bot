@@ -61,6 +61,43 @@ class FlowTests(unittest.TestCase):
         saved = next(i for i, (_, b) in enumerate(services.calls) if b and b.get("action") == "save_record")
         alert = next(i for i, (_, b) in enumerate(services.calls) if b and b.get("action") == "claim_alert")
         self.assertLess(saved, alert); self.assertEqual(len(bot.stats["coverage"]), 5)
+        self.assertEqual(bot.stats["source_pages_processed"], 1)
+        self.assertEqual(bot.stats["event_pages_processed"], 1)
+    def test_listing_and_non_event_work_is_visible_without_saves(self):
+        for kind, counter in [("Listing", "listing_pages_processed"), ("Other", "other_pages_processed")]:
+            with self.subTest(page_kind=kind):
+                services = FakeServices()
+                def transport(url, body=None, headers=None, **kwargs):
+                    response = services(url, body, headers, **kwargs)
+                    if "generativelanguage" in url:
+                        result = json.loads(response["candidates"][0]["content"]["parts"][0]["text"])
+                        result["analyses"][0]["page_kind"] = kind
+                        response["candidates"][0]["content"]["parts"][0]["text"] = json.dumps(result)
+                    return response
+                bot, _ = self.run_bot(service=transport)
+                self.assertEqual(bot.stats["source_pages_processed"], 1)
+                self.assertEqual(bot.stats[counter], 1)
+                self.assertEqual(bot.stats["opportunities_inserted"], 0)
+                summary = [b["text"] for u, b in services.calls if "api.telegram.org" in u][-1]
+                self.assertIn("Source pages processed: 1", summary)
+                self.assertIn("Pending source URLs:", summary)
+    def test_empty_due_queue_is_visible_and_inconsistent_backlog_warns(self):
+        for due_now in [0, 10]:
+            with self.subTest(due_now=due_now):
+                services = FakeServices()
+                def transport(url, body=None, headers=None, **kwargs):
+                    response = services(url, body, headers, **kwargs)
+                    if body and body.get("action") == "queue_due":
+                        return {"ok": True, "items": []}
+                    if body and body.get("action") == "refresh_views":
+                        return {"ok": True, "queue_remaining": due_now + 5, "queue_due_now": due_now, "queue_waiting": 5}
+                    return response
+                bot, _ = self.run_bot(service=transport)
+                self.assertEqual(bot.stats["due_candidates_returned"], 0)
+                self.assertEqual(bot.stats["source_pages_processed"], 0)
+                self.assertEqual(bool(bot.stats["errors"]), bool(due_now))
+                summary = [b["text"] for u, b in services.calls if "api.telegram.org" in u][-1]
+                self.assertIn(f"Due now / waiting until later: {due_now} / 5", summary)
     def test_failed_save_never_alerts(self):
         services = FakeServices(); services.fail_save = True
         bot, services = self.run_bot(service=services)

@@ -1,5 +1,5 @@
 {
-  "version": "2.0.0",
+  "version": "2.0.1",
   "base_commit": "77f27b7e6052a83ba35cb4a5a56a94dca7dd6b81",
   "built_date": "2026-11-03",
   "files": {
@@ -7,23 +7,25 @@
     ".env.example": "02527039765938208f8dea19a71f7cd305ea2cc65e8421682cebe4702d8160f4",
     ".gitignore": "a223ff677c61149d68ddbee5a02ddb213d8f417fcf5be6eff213d51c502a8755",
     "main.py": "3a9846f15340c14f1d57268fd49554bfe482df85dd151da2d8e28b018920996f",
-    "bot_v2.py": "6106f446522ece06ef0084b0b400a5b2e2fa6b7b3392ab77128d9a80f47ca059",
-    "hunter_core.py": "437018c714cb9b6eee1389f0e6c8fc107efa171be7330e33be5dc7d98337c4c1",
+    "bot_v2.py": "f133788525849c1bf0494a0ea2d5d95f57bb8587683b7bfbcbc925b569891a0f",
+    "hunter_core.py": "a5b237311f6717019bdbec8f8d839cb4bff4df3735149b0e94f97d36c09e3c29",
     "config.json": "99401e509fe655a19b2bee06dd1ceffdea3265db84d5b62619d4ec954c397d34",
-    "apps_script.gs": "8fcb867e97af4c91e5461c89d4a511f970d8b9478fb3822306fe9579da222a78",
+    "apps_script.gs": "22a646d7ce57faeb78192f7a12126c5946bae3299b4d550d1f428a485d5683d0",
     "requirements.txt": "4f7e8660ea203aad5e2d54c86b07afb723ae939793dbcb52d3a3c30b935a822c",
-    "README.md": "81070e28a3f195690acadf109c4d7f3f809380a0ab1ac25594ea6d0d9329ac2d",
-    "START-HERE.md": "8a409fd31696cc419ddc5aec3537ac0a85985854b4b950a9f3dc6fe722a1b2df",
-    "VALIDATION.md": "aed096efd042fe16064c2227c1ef476b5f68102e9d92fc89bcdfeae107bad982",
+    "README.md": "bbe6a35dc04e2c841ba0f58d290b1781a3219acc86869a2dc0bd0d03b9654f26",
+    "START-HERE.md": "d2a9e2586928195b1a77789d05ac1733864b22544dc3d1db66f92b4eb8aab42b",
+    "VALIDATION.md": "b7f6c005cc42820e3ca8b6b62768811213ea2e3846fe3b2da6a093b2cd6bbd90",
     "opportunity-hunter.yml": "909cd562cf23d1b7e80ac72e08fd66ab679c4f4ac09552fa1bd85797e31d42e4",
     "tests/test_core.py": "26d22c6bba70ba910304ef0fc97b5d1b39b70ba21adae81e7acc4fc268c33930",
-    "tests/test_flow.py": "158462cc6f6b324d12bd1e65ce82b93bdc7294d5ea518223627ebb9aa99d613e",
-    "tests/apps_script_test.js": "a3fd1523cbd702657ab03ce36a002a698cf94e25bc211c2ff491535e10464e54"
+    "tests/test_flow.py": "60af8b51581486846f83590b6d3d8f32e5a70548f7ab452bd65049062bfceebe",
+    "tests/apps_script_test.js": "f22c50bc9a057581524777e41cab86f17c70012cfac8ecb8f8d645986c1200fa"
   },
   "offline_tests": {
-    "python": 32,
-    "apps_script": 16,
-    "uploaded_opportunity_rows": 371
+    "python": 34,
+    "apps_script": 18,
+    "uploaded_opportunity_rows": 371,
+    "snapshot_apps_script": 19
   },
-  "live_deployment_tested": false
+  "live_deployment_tested": false,
+  "patch_base_commit": "94589904b0559b7fa20cc5ef6e01f47da4c416fd"
 }

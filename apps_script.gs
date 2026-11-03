@@ -1,5 +1,5 @@
-/** Opportunity Hunter 2.0.0. Replace the BOT script file, then run upgradeOpportunityHunter. */
-const APP_VERSION = '2.0.0';
+/** Opportunity Hunter 2.0.1. Existing v2 installs: replace BOT code and redeploy the existing deployment. */
+const APP_VERSION = '2.0.1';
 const DEFAULT_TIMEZONE = 'Asia/Jakarta';
 const V2_SCHEMA = 2;
 const SHEET_NAMES = Object.freeze({OPPORTUNITIES:'Opportunities',REJECTED:'Rejected',RUN_LOGS:'Run Logs',SETTINGS:'Settings'});
@@ -375,9 +375,8 @@ function v2Refresh_(ss) {
   V2_CATEGORIES.forEach(function(name,i){ss.setActiveSheet(v2ViewSheet_(ss,name));ss.moveActiveSheet(i+1);});
   ['Opportunities','Rejected','Run Logs','Bot State','Bot Queue','Bot History'].forEach(function(name){const s=ss.getSheetByName(name);if(s&&!s.isSheetHidden())s.hideSheet();});
   ss.setActiveSheet(v2ViewSheet_(ss,'Business Cases'));
-  const queue=v2Rows_(ss.getSheetByName('Bot Queue')).filter(function(r){return r.State!=='DONE'||String(r['Next Check'])<=v2Today_();});
   const benchmark=v2Benchmark_(ss,rows);
-  return {ok:true,views:V2_CATEGORIES.length,queue_remaining:queue.length,benchmark:benchmark};
+  return Object.assign({ok:true,views:V2_CATEGORIES.length,benchmark:benchmark},v2QueueStatus_(ss));
 }
 function refreshOpportunityViews() {return v2Locked_(function(){return v2Refresh_(v2SS_());});}
 function v2SelectedId_(ss) {
@@ -430,10 +429,25 @@ function v2Enqueue_(ss,items) {
     v2Append_(s,row);byUrl[canonical]=row;inserted++;
   });return {ok:true,inserted:inserted};
 }
+function v2QueueRows_(ss) {
+  const programs=v2Preferences_(ss).include_programs;
+  return v2Rows_(ss.getSheetByName('Bot Queue')).filter(function(r){return programs||r.Family!=='Programs';});
+}
+function v2QueueDate_(row) {
+  // getValues() can return native Date objects or serials, not only ISO text.
+  // Missing/invalid dates remain due so a malformed cell cannot strand work.
+  return v2ISO_(row['Next Check']);
+}
+function v2QueueStatus_(ss) {
+  const today=v2Today_(),rows=v2QueueRows_(ss);
+  const due=rows.filter(function(r){return v2QueueDate_(r)<=today;}).length;
+  const waiting=rows.filter(function(r){return r.State!=='DONE'&&v2QueueDate_(r)>today;}).length;
+  return {queue_remaining:due+waiting,queue_due_now:due,queue_waiting:waiting};
+}
 function v2Due_(ss) {
-  const today=v2Today_(),programs=v2Preferences_(ss).include_programs;const rows=v2Rows_(ss.getSheetByName('Bot Queue')).filter(function(r){return String(r['Next Check']||'')<=today&&(programs||r.Family!=='Programs');});
+  const today=v2Today_(),rows=v2QueueRows_(ss).filter(function(r){return v2QueueDate_(r)<=today;});
   // Stable round-robin families prevents old program monitors from dominating.
-  const groups={};rows.sort(function(a,b){return String(a['Next Check']).localeCompare(String(b['Next Check']));}).forEach(function(r){const kind=r.State==='DONE'?'refresh':r.Kind;const k=r.Family+'|'+kind;(groups[k]||(groups[k]=[])).push(r);});
+  const groups={};rows.sort(function(a,b){return v2QueueDate_(a).localeCompare(v2QueueDate_(b));}).forEach(function(r){const kind=r.State==='DONE'?'refresh':r.Kind;const k=r.Family+'|'+kind;(groups[k]||(groups[k]=[])).push(r);});
   const out=[];while(out.length<250&&Object.keys(groups).some(function(k){return groups[k].length;}))Object.keys(groups).forEach(function(k){if(groups[k].length&&out.length<250)out.push(groups[k].shift());});
   return out.map(function(r){return {url:r.URL,title:r.Title,family:r.Family,query:r.Query,kind:r.State==='DONE'?'refresh':r.Kind};});
 }
