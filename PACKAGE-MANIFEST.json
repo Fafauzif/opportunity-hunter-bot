@@ -1,5 +1,5 @@
 {
-  "version": "2.0.1",
+  "version": "2.0.2",
   "base_commit": "77f27b7e6052a83ba35cb4a5a56a94dca7dd6b81",
   "built_date": "2026-11-03",
   "files": {
@@ -8,23 +8,23 @@
     ".gitignore": "a223ff677c61149d68ddbee5a02ddb213d8f417fcf5be6eff213d51c502a8755",
     "main.py": "3a9846f15340c14f1d57268fd49554bfe482df85dd151da2d8e28b018920996f",
     "bot_v2.py": "f133788525849c1bf0494a0ea2d5d95f57bb8587683b7bfbcbc925b569891a0f",
-    "hunter_core.py": "a5b237311f6717019bdbec8f8d839cb4bff4df3735149b0e94f97d36c09e3c29",
+    "hunter_core.py": "05b8671cdf69c1c70273bdb71203c041b33e81e4cfe446f0358c3299842d8e47",
     "config.json": "99401e509fe655a19b2bee06dd1ceffdea3265db84d5b62619d4ec954c397d34",
-    "apps_script.gs": "22a646d7ce57faeb78192f7a12126c5946bae3299b4d550d1f428a485d5683d0",
+    "apps_script.gs": "f99ba0dc2f6110c9f3d3eb8d373fa3bdb75066fb95c116917350c69db057b6f1",
     "requirements.txt": "4f7e8660ea203aad5e2d54c86b07afb723ae939793dbcb52d3a3c30b935a822c",
-    "README.md": "bbe6a35dc04e2c841ba0f58d290b1781a3219acc86869a2dc0bd0d03b9654f26",
-    "START-HERE.md": "d2a9e2586928195b1a77789d05ac1733864b22544dc3d1db66f92b4eb8aab42b",
-    "VALIDATION.md": "b7f6c005cc42820e3ca8b6b62768811213ea2e3846fe3b2da6a093b2cd6bbd90",
+    "README.md": "e4373c2a4b98faebbcfd9610acf557e480563ad4587b530dbfdce46c604c3acc",
+    "START-HERE.md": "50f06a452d4a70dc01a24fc1a4d49f6696523d84fa49fb40df995d620b1befe6",
+    "VALIDATION.md": "cfeee243171e363c6ad7e7356f7713e9bb1d0f66df3ceb931364cad56672ab0f",
     "opportunity-hunter.yml": "909cd562cf23d1b7e80ac72e08fd66ab679c4f4ac09552fa1bd85797e31d42e4",
     "tests/test_core.py": "26d22c6bba70ba910304ef0fc97b5d1b39b70ba21adae81e7acc4fc268c33930",
     "tests/test_flow.py": "60af8b51581486846f83590b6d3d8f32e5a70548f7ab452bd65049062bfceebe",
-    "tests/apps_script_test.js": "f22c50bc9a057581524777e41cab86f17c70012cfac8ecb8f8d645986c1200fa"
+    "tests/apps_script_test.js": "e524130d9ac5044fd92ae4037868798f87fec20075ea11b4d93eda3d6751b346"
   },
   "offline_tests": {
     "python": 34,
-    "apps_script": 18,
+    "apps_script": 20,
     "uploaded_opportunity_rows": 371,
-    "snapshot_apps_script": 19
+    "snapshot_apps_script": 21
   },
   "live_deployment_tested": false,
   "patch_base_commit": "94589904b0559b7fa20cc5ef6e01f47da4c416fd"

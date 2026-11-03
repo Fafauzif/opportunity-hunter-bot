@@ -1,5 +1,5 @@
-/** Opportunity Hunter 2.0.1. Existing v2 installs: replace BOT code and redeploy the existing deployment. */
-const APP_VERSION = '2.0.1';
+/** Opportunity Hunter 2.0.2. Existing v2 installs: replace BOT code and redeploy the existing deployment. */
+const APP_VERSION = '2.0.2';
 const DEFAULT_TIMEZONE = 'Asia/Jakarta';
 const V2_SCHEMA = 2;
 const SHEET_NAMES = Object.freeze({OPPORTUNITIES:'Opportunities',REJECTED:'Rejected',RUN_LOGS:'Run Logs',SETTINGS:'Settings'});
@@ -343,6 +343,9 @@ function v2Refresh_(ss) {
     const s=v2ViewSheet_(ss,cat);s.clearContents();s.clearNotes();
     const active=rows.filter(function(r){return v2Category_(r)===cat&&r['Deadline Status']!=='EXPIRED'&&r['Record Status']!=='REJECTED';}).sort(function(a,b){return Number(b['Match Score']||0)-Number(a['Match Score']||0)||(v2ISO_(a['Deadline Date'])||'9999').localeCompare(v2ISO_(b['Deadline Date'])||'9999');});
     v2Capacity_(s,active.length+4,9);
+    // The A:I banners span the whole view. A frozen A column would split
+    // those merged cells. Clear an existing column freeze before merging.
+    s.setFrozenColumns(0);
     s.getRange(1,1,1,9).merge().setValue(cat+' — '+active.length+' entries. Select a row → Opportunity Hunter → Open details.');
     s.getRange(2,1,1,9).merge().setValue('Unknown deadlines remain visible for review. Generated view: edit personal progress in My Applications.');
     s.getRange(3,1,1,9).setValues([V2_VIEW_HEADERS]);
@@ -359,7 +362,7 @@ function v2Refresh_(ss) {
       const soon=SpreadsheetApp.newConditionalFormatRule().whenDateBefore(new Date(Date.now()+7*86400000)).setBackground('#fff1d2').setRanges([s.getRange(4,2,active.length,1)]).build();s.setConditionalFormatRules([soon]);
     }
     if(s.getFilter())s.getFilter().remove();s.getRange(3,1,Math.max(active.length+1,2),9).createFilter();
-    s.setFrozenRows(3);s.setFrozenColumns(1);s.setTabColor(cat==='Programs'?'#8794a4':'#146b68');
+    s.setFrozenRows(3);s.setTabColor(cat==='Programs'?'#8794a4':'#146b68');
     [300,125,220,125,180,150,260,80,110].forEach(function(w,i){s.setColumnWidth(i+1,w);});
     s.getRange(3,1,1,9).setBackground('#123b46').setFontColor('#ffffff').setFontWeight('bold');
     s.getDataRange().setWrap(true);if(active.length)s.setRowHeights(4,active.length,60);

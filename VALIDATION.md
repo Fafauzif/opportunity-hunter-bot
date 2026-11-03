@@ -4,7 +4,9 @@ Built from repository commit `77f27b7e6052a83ba35cb4a5a56a94dca7dd6b81` and the 
 
 ## Offline validation
 
-v2.0.1 result: **34 Python tests passed; 18 Apps Script emulator checks passed**, plus **19 checks with the newly supplied XLSX snapshot**, including a migration replay on all 371 uploaded opportunity records.
+v2.0.2 result: **34 Python tests passed; 20 Apps Script emulator checks passed**, plus **21 checks with the supplied XLSX snapshot**, including a migration replay on all 371 uploaded opportunity records.
+
+The live v2.0.1 test exposed a Google Sheets constraint missed by the original emulator: freezing column A splits the merged A:I category banners. After adding merge/freeze boundary enforcement, the original refresh reproduces the failure. v2.0.2 clears the column freeze before merging, retains three frozen header rows, and passes repeated-refresh and existing-freeze recovery tests. This fix has not been deployed to the user's live Sheet here. A strong-review failure is a separate nonfatal warning; it retains the original extraction with review pending.
 
 The 3 November export has 1,450 queue rows, all PENDING with zero attempts, and native date-formatted Next Check cells. Programs are disabled: 637 rows belong to enabled families and 813 to Programs. Replaying the old string comparison on the exported native dates selects zero enabled URLs. The normalized comparison finds all 637 due URLs and returns the first 250 under the existing endpoint cap. This is an offline replay, not a live Apps Script deployment check.
 

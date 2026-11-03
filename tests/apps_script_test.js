@@ -21,7 +21,13 @@ class Range {
   getSheet(){return this.sheet;}
   getA1Notation(){return this.r===2&&this.c===2?'B2':'A1';}
   createFilter(){this.sheet.filter={remove:()=>{this.sheet.filter=null;}};return this.sheet.filter;}
-  merge(){return this;}
+  merge(){
+    const merge={r:this.r,c:this.c,nr:this.nr,nc:this.nc};
+    assert(!(this.c<=this.sheet.frozenColumns&&this.sheet.frozenColumns<this.c+this.nc-1),'Cannot merge across frozen columns');
+    assert(!(this.r<=this.sheet.frozenRows&&this.sheet.frozenRows<this.r+this.nr-1),'Cannot merge across frozen rows');
+    if(!this.sheet.merges.some(m=>JSON.stringify(m)===JSON.stringify(merge)))this.sheet.merges.push(merge);
+    return this;
+  }
   setWrap(){return this;}
   setFontWeight(){return this;}
   setBackground(){return this;}
@@ -31,7 +37,7 @@ class Range {
 }
 let nextId=1;
 class Sheet {
-  constructor(name,cells=[]){Object.assign(this,{name,cells,notes:{},id:nextId++,hidden:false,protections:[]});}
+  constructor(name,cells=[]){Object.assign(this,{name,cells,notes:{},id:nextId++,hidden:false,protections:[],merges:[],frozenColumns:0,frozenRows:0});}
   getName(){return this.name;}
   getSheetId(){return this.id;}
   getLastRow(){let last=0;this.cells.forEach((r,i)=>{if(r?.some(v=>v!==''&&v!==undefined&&v!==null))last=i+1;});return last;}
@@ -45,8 +51,8 @@ class Sheet {
   appendRow(row){this.cells[this.getLastRow()]=row.slice();return this;}
   clearContents(){this.cells=[];return this;}
   clearNotes(){this.notes={};return this;}
-  setFrozenRows(){return this;}
-  setFrozenColumns(){return this;}
+  setFrozenRows(n){for(const m of this.merges)assert(!(m.r<=n&&n<m.r+m.nr-1),'Cannot freeze part of a merged cell');this.frozenRows=n;return this;}
+  setFrozenColumns(n){for(const m of this.merges)assert(!(m.c<=n&&n<m.c+m.nc-1),'Cannot freeze part of a merged cell');this.frozenColumns=n;return this;}
   setColumnWidth(){return this;}
   setRowHeights(){return this;}
   setConditionalFormatRules(){return this;}
@@ -91,6 +97,13 @@ function check(name,fn){fn();checks++;console.log('PASS '+name);}
 check('formula injection escaping',()=>assert.equal(call('v2Safe_','=IMPORTXML("bad")'),'\'=IMPORTXML("bad")'));
 check('case-sensitive URL path preserved',()=>assert.equal(call('v2Canonical_','https://www.EXAMPLE.org/Event/?b=2&utm_source=x&a=1#x'),'https://example.org/Event?a=1&b=2'));
 check('invalid calendar date rejected',()=>assert.equal(call('v2ISO_','2026-02-30'),''));
+check('emulator enforces merged-cell freeze boundaries',()=>{
+  const s=new Sheet('Merged freeze regression');s.getRange('A1:I1').merge();
+  assert.throws(()=>s.setFrozenColumns(1),/merged cell/);
+  s.setFrozenColumns(9);s.setFrozenColumns(0);s.setFrozenRows(3);
+  const t=new Sheet('Frozen merge regression');t.setFrozenColumns(1);
+  assert.throws(()=>t.getRange('A1:I1').merge(),/frozen columns/);
+});
 check('legacy IDs and aliases migrate idempotently',()=>{
   const h=['','Title','Opportunity ID','ID Aliases','Warning Flags'];
   const a='a'.repeat(32),b='b'.repeat(32),c='c'.repeat(32);
@@ -135,7 +148,7 @@ const originalMain=workbook.getSheetByName('Opportunities'),beforeCount=original
 const originalTitles=call('v2Rows_',originalMain).map(r=>r.Title);
 check('full upgrade backs up before mutation and keeps webhook secret',()=>{
   call('upgradeOpportunityHunter');assert.equal(workbook.backups.length,1);assert.equal(props.WEBHOOK_SECRET,'test-webhook-secret');assert.equal(props.V2_SCHEMA,'2');
-  const health=JSON.parse(call('doGet').text);assert.equal(health.version,'2.0.1');assert.equal(health.schema_version,2);
+  const health=JSON.parse(call('doGet').text);assert.equal(health.version,'2.0.2');assert.equal(health.schema_version,2);
 });
 check('all main records and titles preserved',()=>{
   assert.equal(originalMain.getLastRow()-1,beforeCount);assert.equal(JSON.stringify(call('v2Rows_',originalMain).map(r=>r.Title)),JSON.stringify(originalTitles));
@@ -145,6 +158,19 @@ check('all records have unique canonical IDs after migration',()=>{
 });
 check('category views have exactly nine columns',()=>{
   for(const cat of evaluate('V2_CATEGORIES'))assert.equal(call('v2ViewSheet_',workbook,cat).getLastColumn(),9);
+});
+check('category refresh preserves merged banners without splitting a column freeze',()=>{
+  const categories=evaluate('V2_CATEGORIES');
+  // Simulate an existing tab with a freeze that would conflict with the new
+  // banners. clearContents() must not be assumed to remove either setting.
+  const existing=call('v2ViewSheet_',workbook,categories[0]);existing.merges=[];existing.setFrozenColumns(1);
+  call('v2Refresh_',workbook);call('v2Refresh_',workbook);
+  for(const cat of categories){
+    const s=call('v2ViewSheet_',workbook,cat);
+    assert.equal(s.frozenColumns,0);assert.equal(s.frozenRows,3);
+    assert(s.merges.some(m=>m.r===1&&m.c===1&&m.nr===1&&m.nc===9));
+    assert(s.merges.some(m=>m.r===2&&m.c===1&&m.nr===1&&m.nc===9));
+  }
 });
 check('rerunning upgrade creates no duplicate rows, queue or backups',()=>{
   const queueCount=workbook.getSheetByName('Bot Queue').getLastRow(),appCount=call('v2ViewSheet_',workbook,'My Applications').getLastRow();

@@ -84,7 +84,7 @@ Checkpoint: all required secret **names** appear in GitHub. You do not need to r
 
 Replace the existing bot file; do **not** leave the old bot code beside a second copy with the same functions/constants. If your project has unrelated scripts, leave those alone. Do not paste `tests/apps_script_test.js` into Apps Script.
 
-Checkpoint: the top of the new bot script says **2.0.1**. Existing Script Properties, including `WEBHOOK_SECRET`, remain intact. Do not rotate or recreate that secret.
+Checkpoint: the top of the new bot script says **2.0.2**. Existing Script Properties, including `WEBHOOK_SECRET`, remain intact. Do not rotate or recreate that secret.
 
 ## 5. Run the sheet upgrade once
 
@@ -121,7 +121,7 @@ Saving code is **not** the same as updating the bot's `/exec` deployment.
 
 The URL should stay the same because you edited the existing deployment. **Do not click New deployment** unless you intentionally want to change the webhook URL and update the matching GitHub secret.
 
-Checkpoint: opening your existing `/exec` URL in a browser shows JSON including `"version":"2.0.1"` and `"schema_version":2`. It does not expose your spreadsheet data or secret.
+Checkpoint: opening your existing `/exec` URL in a browser shows JSON including `"version":"2.0.2"` and `"schema_version":2`. It does not expose your spreadsheet data or secret.
 
 ## 7. Run verification
 
@@ -198,6 +198,7 @@ This governs **this bot's reviewer requests**, not all spending on your OpenRout
 | Telegram rejected message | Open the bot and press Start; confirm bot token and chat ID |
 | No priority alerts | Check stored results and review flags. Missing costs/eligibility/deadlines are retained, not automatically promoted |
 | Searches succeed but pages fetched, Gemini calls and saves all stay at zero | Update to v2.0.1 and redeploy the existing Apps Script deployment. v2.0.0 skips due work stored as native Sheets dates. Verification does not test this queue path |
+| Can't freeze columns containing part of a merged cell | Update Apps Script to v2.0.2 and redeploy the existing deployment. The category banners span A:I, so the refresh now clears the conflicting column freeze while keeping three header rows frozen |
 | Old records disappeared from category view | Expired/rejected records remain in the background Opportunities table |
 | A category has few events | Check family coverage and queue state. Searching a category does not guarantee eligible open events exist |
 | Manual button says no row selected | Select a data row below the category headers, not the title/summary row |
