@@ -4,7 +4,9 @@ Built from repository commit `77f27b7e6052a83ba35cb4a5a56a94dca7dd6b81` and the 
 
 ## Offline validation
 
-v2.0.2 result: **34 Python tests passed; 20 Apps Script emulator checks passed**, plus **21 checks with the supplied XLSX snapshot**, including a migration replay on all 371 uploaded opportunity records.
+v2.1.0 result: **34 Python tests passed; 25 Apps Script emulator checks passed**, plus **26 checks with the supplied XLSX snapshot**, including a migration replay on all 371 uploaded opportunity records. The separate Node sidebar client test passes initial load, reloading another record, selection errors, recovery, text escaping and safe source links.
+
+Browsing checks verify that All Opportunities contains every saved ID, exposes Category/Status and appears first; category views retain nine columns; rich rows preserve descriptions, eligibility restrictions and deliverables; unknown costs are not displayed as zero; actionable rows rank ahead of review/closed records; selection remains attached to IDs after sorting; the sidebar opens without changing tabs; and legacy v2.0 selections work before the first refresh. The original workbook is unchanged. This update has not been deployed to the live Sheet, and native Google sidebar authorization/rendering has not been tested here. A local Playwright visual check could not run because the runtime has no Chromium executable; client behavior was exercised using Node's VM instead.
 
 The live v2.0.1 test exposed a Google Sheets constraint missed by the original emulator: freezing column A splits the merged A:I category banners. After adding merge/freeze boundary enforcement, the original refresh reproduces the failure. v2.0.2 clears the column freeze before merging, retains three frozen header rows, and passes repeated-refresh and existing-freeze recovery tests. This fix has not been deployed to the user's live Sheet here. A strong-review failure is a separate nonfatal warning; it retains the original extraction with review pending.
 
@@ -47,5 +49,7 @@ Provider credentials, actual model/schema compatibility, quota availability, Goo
 - https://openrouter.ai/docs/guides/features/structured-outputs
 - https://openrouter.ai/docs/guides/routing/provider-selection
 - https://developers.google.com/apps-script/concepts/deployments
+- https://developers.google.com/apps-script/guides/dialogs
+- https://developers.google.com/apps-script/reference/spreadsheet/range
 
 The packaged workflow and configuration avoid new search-provider accounts. Prices and availability can change; verification fails or defers the reviewer rather than silently choosing an unbounded paid fallback.

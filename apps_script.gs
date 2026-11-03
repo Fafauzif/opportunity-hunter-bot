@@ -1,5 +1,5 @@
-/** Opportunity Hunter 2.0.2. Existing v2 installs: replace BOT code and redeploy the existing deployment. */
-const APP_VERSION = '2.0.2';
+/** Opportunity Hunter 2.1.0. Existing v2: replace code, run refreshOpportunityViews, redeploy the existing deployment. */
+const APP_VERSION = '2.1.0';
 const DEFAULT_TIMEZONE = 'Asia/Jakarta';
 const V2_SCHEMA = 2;
 const SHEET_NAMES = Object.freeze({OPPORTUNITIES:'Opportunities',REJECTED:'Rejected',RUN_LOGS:'Run Logs',SETTINGS:'Settings'});
@@ -121,8 +121,9 @@ const V2_EXTRA_COLUMNS = [
 ];
 const V2_QUEUE_HEADERS = ['Candidate ID','URL','Title','Family','Query','Kind','State','Next Check','Last Checked','Attempts','Detail'];
 const V2_APP_HEADERS = ['Opportunity ID','Title','Status','Next Action','Personal Due Date','Teammates','Priority','Applied Date','Notes'];
-const V2_VIEW_HEADERS = ['Competition','Entry Deadline','Eligibility','Solo / Team','Format / Location','Entry Cost','What to Submit','Apply','Details'];
+const V2_VIEW_HEADERS = ['Competition','What is this?','Entry Deadline','Eligibility','Solo / Team','Format / Location','Entry Cost','What to Submit','Apply'];
 const V2_CATEGORIES = ['Business Cases','Marketing','Essays & Policy','Pitch & Innovation','Speaking & Debate','Programs'];
+const V2_BROWSE_VIEWS = ['All Opportunities'].concat(V2_CATEGORIES);
 const V2_SETTING_DEFAULTS = {
   enabled:true, include_programs:false, review_enabled:true, review_monthly_budget_usd:1,
   application_fee_limit_idr:300000, personal_cost_guideline_idr:1000000, telegram_score_threshold:75,
@@ -131,10 +132,10 @@ const V2_SETTING_DEFAULTS = {
 
 function onOpen() {
   SpreadsheetApp.getUi().createMenu('Opportunity Hunter')
-    .addItem('1. Upgrade database (backup first)','upgradeOpportunityHunter')
-    .addItem('Open details for selected row','openSelectedDetails')
+    .addItem('Legacy v1: upgrade database (backup first)','upgradeOpportunityHunter')
+    .addItem('Open info sidebar','openSelectedDetails')
     .addItem('Save selected opportunity','saveSelectedOpportunity')
-    .addItem('Refresh category views','refreshOpportunityViews')
+    .addItem('Refresh all opportunity views','refreshOpportunityViews')
     .addItem('Settings and run checks','showHunterSettings')
     .addItem('Show background data','showBackgroundData')
     .addToUi();
@@ -337,35 +338,68 @@ function v2UpdateDeadlines_(ss) {
   [d,st,rs,al].forEach(function(col){s.getRange(2,col+1,rows.length,1).setValues(rows.map(function(r){return [r[col]];}));});
 }
 function v2LinkFormula_(url,label) {return '=HYPERLINK("'+v2Url_(url).replace(/"/g,'""')+'","'+String(label).replace(/"/g,'""')+'")';}
+function v2Labeled_(r,fields) {
+  return fields.filter(function(f){return v2Text_(r[f[0]]).trim();}).map(function(f){return f[1]+': '+v2Text_(r[f[0]]);}).join('\n');
+}
+function v2EligibilityText_(r) {
+  const status=v2Text_(r['Eligibility Status'])||'Eligibility unclear';
+  const rules=v2Labeled_(r,[['Education Requirement','Education'],['Nationality Requirement','Nationality'],['Age Requirement','Age'],['Residence Requirement','Residence'],['University Requirement','University'],['Experience Requirement','Experience']]);
+  return status+'\n'+(rules||v2Text_(r['Eligibility Evidence'])||'Restrictions not yet documented; check the source.')+(r['Review Reason']?'\nCheck: '+v2Text_(r['Review Reason']):'');
+}
+function v2CostText_(r) {
+  const value=r['Total Entry Cost IDR'],known=value!==''&&value!==null&&value!==undefined&&Number.isFinite(Number(value))&&Number(value)>=0;
+  const fee=known?'Entry: Rp'+Number(value).toLocaleString('en-US'):r['Entry Fee Status']==='Free'?'Entry: Free':'Entry cost unknown';
+  const personal=r['Estimated Personal Cost IDR'],personalKnown=personal!==''&&personal!==null&&personal!==undefined&&Number.isFinite(Number(personal))&&Number(personal)>=0;
+  const raw=v2Labeled_(r,[['Application Fee Raw','Application'],['Registration Fee Raw','Registration']]);
+  const travel=/offline|hybrid/i.test(String(r.Format||''))||/offline|in.person|travel/i.test(String(r.Rounds||''));
+  return fee+(raw?'\n'+raw:'')+(personalKnown?'\nPersonal estimate: Rp'+Number(personal).toLocaleString('en-US'):travel?'\nTravel / personal costs unknown':'')+(r.Rounds?'\nRounds: '+v2Text_(r.Rounds):'');
+}
+function v2ActionTier_(r) {
+  if(r['Record Status']==='CLOSED'||r['Record Status']==='REJECTED'||r['Deadline Status']==='EXPIRED')return 3;
+  const deadline=v2ISO_(r['Deadline Date']);
+  if(r['Alert Level']==='PRIORITY'&&deadline)return 0;
+  return deadline&&/^(Eligible|Probably Eligible)$/.test(String(r['Eligibility Status']))&&!r['Review Reason']&&!r['Warning Flags']?1:2;
+}
 function v2Refresh_(ss) {
   v2UpdateDeadlines_(ss);const rows=v2Rows_(ss.getSheetByName('Opportunities'));
-  V2_CATEGORIES.forEach(function(cat){
-    const s=v2ViewSheet_(ss,cat);s.clearContents();s.clearNotes();
-    const active=rows.filter(function(r){return v2Category_(r)===cat&&r['Deadline Status']!=='EXPIRED'&&r['Record Status']!=='REJECTED';}).sort(function(a,b){return Number(b['Match Score']||0)-Number(a['Match Score']||0)||(v2ISO_(a['Deadline Date'])||'9999').localeCompare(v2ISO_(b['Deadline Date'])||'9999');});
-    v2Capacity_(s,active.length+4,9);
+  V2_BROWSE_VIEWS.forEach(function(cat){
+    const overview=cat==='All Opportunities',width=overview?11:9,deadlineCol=overview?5:3;
+    const headers=overview?['Competition','Category','Status'].concat(V2_VIEW_HEADERS.slice(1)):V2_VIEW_HEADERS;
+    const s=v2ViewSheet_(ss,cat);s.clearContents();s.clearNotes();s.setConditionalFormatRules([]);
+    const active=rows.filter(function(r){return overview||v2Category_(r)===cat&&r['Deadline Status']!=='EXPIRED'&&r['Record Status']!=='REJECTED'&&r['Record Status']!=='CLOSED';}).sort(function(a,b){return v2ActionTier_(a)-v2ActionTier_(b)||(v2ISO_(a['Deadline Date'])||'9999').localeCompare(v2ISO_(b['Deadline Date'])||'9999')||Number(b['Match Score']||0)-Number(a['Match Score']||0);});
+    v2Capacity_(s,active.length+4,width);
     // The A:I banners span the whole view. A frozen A column would split
     // those merged cells. Clear an existing column freeze before merging.
     s.setFrozenColumns(0);
-    s.getRange(1,1,1,9).merge().setValue(cat+' — '+active.length+' entries. Select a row → Opportunity Hunter → Open details.');
-    s.getRange(2,1,1,9).merge().setValue('Unknown deadlines remain visible for review. Generated view: edit personal progress in My Applications.');
-    s.getRange(3,1,1,9).setValues([V2_VIEW_HEADERS]);
+    s.getRange(1,1,1,width).merge().setValue(cat+' — '+active.length+' opportunities');
+    s.getRange(2,1,1,width).merge().setValue(overview?'Every saved record, including closed / rejected entries. Filter Category or Status to narrow the list. More context: Opportunity Hunter → Open info sidebar.':'Read the opportunity in its row. More context: select a row → Opportunity Hunter → Open info sidebar. Save progress in My Applications.');
+    s.getRange(1,1,1,width).setBackground('#123b46').setFontColor('#ffffff').setFontWeight('bold').setFontSize(15);
+    s.getRange(2,1,1,width).setBackground('#eaf3f2').setFontColor('#234b50').setFontSize(10);
+    s.setRowHeights(1,1,38);s.setRowHeights(2,1,34);s.setRowHeights(3,1,32);
+    s.getRange(3,1,1,width).setValues([headers]);
     if(active.length){
       const values=active.map(function(r){
-        const raw=v2Text_(r['Entry Fee Status']);const cost=Number(r['Total Entry Cost IDR']);
-        const fee=raw==='Free'?'Free':r['Total Entry Cost IDR']!==''&&cost>=0?'Rp'+cost.toLocaleString('en-US'):'Unknown — see Details';
-        const elig=v2Text_(r['Eligibility Status'])+(r['Review Reason']?' — review flags':'');
-        return [v2Safe_(r.Title),v2Date_(r['Deadline Date'])||'Unknown',v2Safe_(elig),v2Safe_(r['Team Size']||r['Individual / Team']||'Unknown'),v2Safe_((r.Format||'Unknown')+(r.Location?' / '+r.Location:'')),fee,v2Safe_(String(r['Main Deliverable']||r['Application Requirements']||'See rules').slice(0,240)),'','Open details'];
-      });s.getRange(4,1,values.length,9).setValues(values);
-      s.getRange(4,8,active.length,1).setFormulas(active.map(function(r){const direct=v2Url_(r['Application URL']);return [v2LinkFormula_(direct||r['Official URL']||r['Source URL'],direct?'Apply':'Source')];}));
-      s.getRange(4,9,active.length,1).setNotes(active.map(function(r){return [String(r['Opportunity ID'])];}));
-      s.getRange(4,2,active.length,1).setNumberFormat('dd mmm yyyy');
-      const soon=SpreadsheetApp.newConditionalFormatRule().whenDateBefore(new Date(Date.now()+7*86400000)).setBackground('#fff1d2').setRanges([s.getRange(4,2,active.length,1)]).build();s.setConditionalFormatRules([soon]);
+        const description=v2Text_(r['What Is This Opportunity?'])||'Description not yet available; check the organizer source.';
+        const summary=description+(r['Why It May Matter']?'\n\nWhy it may fit: '+v2Text_(r['Why It May Matter']):'')+(r['Prize / Benefits']?'\n\nPrize / benefits: '+v2Text_(r['Prize / Benefits']):'');
+        const submit=v2Labeled_(r,[['Main Deliverable','Deliverable'],['Application Requirements','Requirements'],['Rounds','Rounds']])||'Submission requirements not yet documented; check the source.';
+        const team=v2Labeled_(r,[['Individual / Team','Format'],['Team Size','Size']])||'Unknown';
+        const result=[v2Safe_(r.Title),v2Safe_(summary),v2Date_(r['Deadline Date'])||'Unknown — needs checking',v2Safe_(v2EligibilityText_(r)),v2Safe_(team),v2Safe_((r.Format||'Unknown')+(r.Location?'\n'+r.Location:'')),v2Safe_(v2CostText_(r)),v2Safe_(submit),''];
+        if(overview)result.splice(1,0,v2Category_(r),r['Deadline Status']==='EXPIRED'?'Closed / expired':r['Record Status']==='REJECTED'?'Rejected':r['Record Status']==='CLOSED'?'Closed':r['Alert Level']==='PRIORITY'?'Priority':v2ActionTier_(r)===2?'Needs review':'Active');
+        return result;
+      });s.getRange(4,1,values.length,width).setValues(values);
+      s.getRange(4,width,active.length,1).setFormulas(active.map(function(r){const direct=v2Url_(r['Application URL']),url=direct||v2Url_(r['Official URL'])||v2Url_(r['Source URL']);return [url?v2LinkFormula_(url,direct?'Apply':'Source'):'Source unavailable'];}));
+      s.getRange(4,1,active.length,1).setNotes(active.map(function(r){return [String(r['Opportunity ID'])];}));
+      const body=s.getRange(4,1,active.length,width);body.setFontColor('#18333b').setFontSize(11).setVerticalAlignment('top');
+      body.setBackgrounds(active.map(function(r,i){return Array(width).fill(i%2?'#f2f7f7':'#ffffff');}));
+      s.getRange(4,1,active.length,1).setFontWeight('bold');
+      s.getRange(4,deadlineCol,active.length,1).setNumberFormat('dd mmm yyyy').setBackgrounds(active.map(function(r){return [r['Deadline Status']==='EXPIRED'?'#e9ecef':!v2ISO_(r['Deadline Date'])?'#fff1d2':Number(r['Days Remaining'])<7?'#ffe3dc':'#e9f3ed'];}));
     }
-    if(s.getFilter())s.getFilter().remove();s.getRange(3,1,Math.max(active.length+1,2),9).createFilter();
+    if(s.getFilter())s.getFilter().remove();s.getRange(3,1,Math.max(active.length+1,2),width).createFilter();
     s.setFrozenRows(3);s.setTabColor(cat==='Programs'?'#8794a4':'#146b68');
-    [300,125,220,125,180,150,260,80,110].forEach(function(w,i){s.setColumnWidth(i+1,w);});
-    s.getRange(3,1,1,9).setBackground('#123b46').setFontColor('#ffffff').setFontWeight('bold');
-    s.getDataRange().setWrap(true);if(active.length)s.setRowHeights(4,active.length,60);
+    const widths=[260,440,135,330,140,180,240,330,90];if(overview)widths.splice(1,0,155,130);
+    widths.forEach(function(w,i){s.setColumnWidth(i+1,w);});
+    s.getRange(3,1,1,width).setBackground('#123b46').setFontColor('#ffffff').setFontWeight('bold');
+    s.getDataRange().setWrap(true);if(active.length){s.setRowHeights(4,active.length,140);s.autoResizeRows(4,active.length);}
     // Generated cells are guarded with a warning rather than an ownership lock.
     if(!s.getProtections(SpreadsheetApp.ProtectionType.SHEET).length)s.protect().setDescription('Generated category view; edit My Applications instead').setWarningOnly(true);
   });
@@ -375,17 +409,21 @@ function v2Refresh_(ss) {
   const status=SpreadsheetApp.newDataValidation().requireValueInList(['Shortlisted','Preparing','Submitted','Finalist','Won','Not Selected','Withdrawn'],true).setAllowInvalid(true).build();apps.getRange(2,3,Math.max(apps.getMaxRows()-1,1),1).setDataValidation(status);
   if(apps.getLastRow()>1){apps.getRange(2,5,apps.getLastRow()-1,1).setNumberFormat('dd mmm yyyy');apps.getRange(2,8,apps.getLastRow()-1,1).setNumberFormat('dd mmm yyyy');}
   // Category tabs first, operations in the background. Never hide the user's own tabs.
-  V2_CATEGORIES.forEach(function(name,i){ss.setActiveSheet(v2ViewSheet_(ss,name));ss.moveActiveSheet(i+1);});
-  ['Opportunities','Rejected','Run Logs','Bot State','Bot Queue','Bot History'].forEach(function(name){const s=ss.getSheetByName(name);if(s&&!s.isSheetHidden())s.hideSheet();});
-  ss.setActiveSheet(v2ViewSheet_(ss,'Business Cases'));
+  V2_BROWSE_VIEWS.forEach(function(name,i){ss.setActiveSheet(v2ViewSheet_(ss,name));ss.moveActiveSheet(i+1);});
+  ['Opportunities','Rejected','Run Logs','Bot State','Bot Queue','Bot History',v2ViewSheet_(ss,'Details').getName()].forEach(function(name){const s=ss.getSheetByName(name);if(s&&!s.isSheetHidden())s.hideSheet();});
+  ss.setActiveSheet(v2ViewSheet_(ss,'All Opportunities'));
   const benchmark=v2Benchmark_(ss,rows);
-  return Object.assign({ok:true,views:V2_CATEGORIES.length,benchmark:benchmark},v2QueueStatus_(ss));
+  return Object.assign({ok:true,views:V2_BROWSE_VIEWS.length,benchmark:benchmark},v2QueueStatus_(ss));
 }
 function refreshOpportunityViews() {return v2Locked_(function(){return v2Refresh_(v2SS_());});}
 function v2SelectedId_(ss) {
   const s=ss.getActiveSheet(),range=s.getActiveRange();if(!range)throw new Error('Select an opportunity row first');
   if(s.getSheetId()===v2ViewSheet_(ss,'My Applications').getSheetId()&&range.getRow()>1)return String(s.getRange(range.getRow(),1).getValue());
-  if(V2_CATEGORIES.some(function(c){return v2ViewSheet_(ss,c).getSheetId()===s.getSheetId();})&&range.getRow()>3)return s.getRange(range.getRow(),9).getNote();
+  if(V2_BROWSE_VIEWS.some(function(c){return v2ViewSheet_(ss,c).getSheetId()===s.getSheetId();})&&range.getRow()>3){
+    // v2.0 stored IDs on column I. Keep that layout readable until refresh.
+    const current=s.getRange(3,2).getValue()==='What is this?'||s.getRange(3,2).getValue()==='Category';
+    const id=s.getRange(range.getRow(),current?1:9).getNote();if(id)return id;
+  }
   throw new Error('Select a data row in a category tab or My Applications');
 }
 function v2RenderDetails_(ss,id) {
@@ -398,17 +436,66 @@ function v2RenderDetails_(ss,id) {
   s.setColumnWidth(1,240);s.setColumnWidth(2,850);s.getDataRange().setWrap(true);s.setFrozenRows(2);s.getRange('A1:B1').setFontWeight('bold').setBackground('#123b46').setFontColor('white');
   return s;
 }
-function openSelectedDetails() {const ss=v2SS_(),id=v2SelectedId_(ss);ss.setActiveSheet(v2RenderDetails_(ss,id));}
+function getSelectedOpportunityDetails() {
+  const ss=SpreadsheetApp.getActiveSpreadsheet()||v2SS_(),id=v2SelectedId_(ss);
+  const r=v2Rows_(ss.getSheetByName('Opportunities')).find(function(row){return row['Opportunity ID']===id;});
+  if(!r)throw new Error('This opportunity is no longer in the database. Refresh the view and select a data row.');
+  const groups=[
+    ['Overview',['Organizer','Primary Type','Edition Year','Track','What Is This Opportunity?','Why It May Matter','Prize / Benefits']],
+    ['Eligibility',['Eligibility Status','Undergraduate Eligible','Indonesian Eligible','Age Requirement','Education Requirement','Nationality Requirement','Residence Requirement','University Requirement','Experience Requirement','Eligibility Evidence']],
+    ['Dates',['Opening Date','Registration Deadline','Submission Deadline','Deadline Date','Deadline Raw','Deadline Timezone','Deadline Precision','Start Date','End Date','Deadline Evidence']],
+    ['Fees and personal costs',['Entry Fee Status','Total Entry Cost IDR','Application Fee Raw','Application Fee IDR','Registration Fee Raw','Registration Fee IDR','Participation Fee IDR','Estimated Personal Cost IDR','Entry Fee Evidence','Funding Status','Funding Coverage','Funding Evidence']],
+    ['Entry and rounds',['Individual / Team','Team Size','Main Deliverable','Application Requirements','Rounds','Judging Rules','AI and IP Rules','Format','Location','Host Country','Language']],
+    ['Source checks',['Official Source Status','Last Source Check','Verification Status','Review Reason','Warning Flags','Match Score','AI Confidence','Extraction Model']]
+  ];
+  return {id:id,title:v2Text_(r.Title),category:v2Category_(r),groups:groups.map(function(group){return {title:group[0],fields:group[1].filter(function(k){return v2Text_(r[k]).trim();}).map(function(k){return {label:k,value:/IDR$/.test(k)&&Number(r[k])<0?'Unknown':v2Text_(r[k])};})};}),
+    links:['Application URL','Official URL','Source URL'].filter(function(k){return v2Url_(r[k]);}).map(function(k){return {label:k.replace(' URL',''),url:v2Url_(r[k])};})};
+}
+function openSelectedDetails() {
+  SpreadsheetApp.getUi().showSidebar(HtmlService.createHtmlOutput(v2SidebarHTML_()).setTitle('Opportunity info'));
+}
+function v2SidebarHTML_() {
+  // Kept inside the .gs file so installation does not require a second HTML file.
+  return String.raw`<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+:root{--ink:#18333b;--muted:#52686e;--teal:#146b68;--line:#d8e4e3;--paper:#f2f7f7}
+*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:14px/1.55 Arial,sans-serif}
+header{padding:20px 16px 16px;background:#123b46;color:white}header p{margin:0 0 6px;color:#b8d9d7;font-size:12px;letter-spacing:.07em;text-transform:uppercase}
+h1{font-size:21px;line-height:1.3;margin:0;overflow-wrap:anywhere}.controls{padding:14px 16px;background:white;border-bottom:1px solid var(--line)}
+button{width:100%;min-height:44px;border:0;border-radius:7px;padding:10px;background:var(--teal);color:white;font:700 14px Arial,sans-serif;cursor:pointer}
+button:hover{background:#105653}button:disabled{opacity:.65;cursor:wait}button:focus-visible,a:focus-visible,summary:focus-visible{outline:3px solid #ca8300;outline-offset:3px}
+.hint{margin:9px 0 0;color:var(--muted);font-size:12px}.status{padding:12px 16px;color:var(--muted)}.status.error{color:#a03124;background:#fff0eb}
+main{padding:0 12px 20px}details{margin:0 0 10px;background:white;border:1px solid var(--line);border-radius:9px;overflow:hidden}
+summary{padding:13px;font-weight:bold;cursor:pointer;background:#fbfdfd}dl{margin:0;padding:0 13px 13px}dt{font-size:12px;font-weight:bold;color:var(--muted);margin-top:13px}dd{margin:3px 0 0;white-space:pre-wrap;overflow-wrap:anywhere}
+.links{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px}.links a{display:inline-flex;align-items:center;min-height:40px;padding:7px 11px;border:1px solid #a9ceca;border-radius:6px;color:#105b58;background:white;text-decoration:none;font-weight:bold;font-size:12px}
+.empty{padding:14px;color:var(--muted)}
+</style></head><body>
+<header><p id="category">Opportunity Hunter</p><h1 id="title">Explore an opportunity</h1></header>
+<div class="controls"><button id="load" type="button">Load selected row</button><p class="hint">Select a row in All Opportunities, a category, or My Applications, then load it here.</p></div>
+<div id="status" class="status" role="status" aria-live="polite">Loading your selection…</div><main id="content"></main>
+<script>
+const button=document.getElementById('load'),status=document.getElementById('status'),content=document.getElementById('content');
+function node(tag,text){const item=document.createElement(tag);if(text!==undefined)item.textContent=text;return item;}
+function show(data){
+  button.disabled=false;status.className='status';status.textContent='Showing the selected opportunity.';
+  document.getElementById('title').textContent=data.title;document.getElementById('category').textContent=data.category;content.replaceChildren();
+  const links=node('nav');links.className='links';links.setAttribute('aria-label','Opportunity sources');
+  data.links.forEach(function(link){const url=String(link.url||'').toLowerCase();if(url.indexOf('https://')!==0&&url.indexOf('http://')!==0)return;const a=node('a',link.label);a.href=link.url;a.target='_blank';a.rel='noopener noreferrer';links.appendChild(a);});content.appendChild(links);
+  data.groups.forEach(function(group,index){const box=node('details');box.open=index<3;box.appendChild(node('summary',group.title));const list=node('dl');
+    group.fields.forEach(function(field){list.appendChild(node('dt',field.label));list.appendChild(node('dd',field.value));});
+    if(!group.fields.length){const empty=node('p','Not yet documented in the source record.');empty.className='empty';box.appendChild(empty);}else box.appendChild(list);content.appendChild(box);
+  });
+}
+function failed(error){button.disabled=false;content.replaceChildren();document.getElementById('title').textContent='Select an opportunity';document.getElementById('category').textContent='Opportunity Hunter';status.className='status error';status.textContent=error.message||'Could not load that row. Select a data row and try again.';}
+function load(){button.disabled=true;status.className='status';status.textContent='Loading your selection…';content.replaceChildren();google.script.run.withSuccessHandler(show).withFailureHandler(failed).getSelectedOpportunityDetails();}
+button.addEventListener('click',load);load();
+</script></body></html>`;
+}
 function saveSelectedOpportunity() {const ss=v2SS_(),id=v2SelectedId_(ss);v2Locked_(function(){const s=v2ViewSheet_(ss,'My Applications');if(!v2Rows_(s).some(function(r){return r['Opportunity ID']===id;})){const r=v2Rows_(ss.getSheetByName('Opportunities')).find(function(r){return r['Opportunity ID']===id;});if(!r)throw new Error('Opportunity no longer found');v2Append_(s,{'Opportunity ID':id,Title:r.Title,Status:'Shortlisted'});}ss.setActiveSheet(s);});}
 function onEdit(e) {if(!e||!e.range)return;const ss=e.source,s=e.range.getSheet();const id=v2Props_().getProperty('V2_VIEW_Details');if(String(s.getSheetId())===id&&e.range.getA1Notation()==='B2')v2RenderDetails_(ss,String(e.range.getValue()));}
-function onSelectionChange(e) {
-  if(!e||!e.range||e.range.getColumn()!==9||e.range.getRow()<4)return;
-  const ss=e.source,s=e.range.getSheet();
-  if(!V2_CATEGORIES.some(function(c){return String(s.getSheetId())===v2Props_().getProperty('V2_VIEW_'+c);}))return;
-  const id=e.range.getNote();if(id)ss.setActiveSheet(v2RenderDetails_(ss,id));
-}
 function showHunterSettings() {const ss=v2SS_();ss.getSheetByName('Settings').showSheet();ss.setActiveSheet(ss.getSheetByName('Settings'));}
-function showBackgroundData() {const ss=v2SS_();['Opportunities','Rejected','Run Logs','Bot Queue','Bot History','Benchmark'].forEach(function(n){const s=ss.getSheetByName(n);if(s)s.showSheet();});}
+function showBackgroundData() {const ss=v2SS_();['Opportunities','Rejected','Run Logs','Bot Queue','Bot History','Benchmark',v2ViewSheet_(ss,'Details').getName()].forEach(function(n){const s=ss.getSheetByName(n);if(s)s.showSheet();});}
 
 function doGet() {return v2JSON_({ok:true,version:APP_VERSION,schema_version:Number(v2Props_().getProperty('V2_SCHEMA')||0)});}
 function v2JSON_(v) {return ContentService.createTextOutput(JSON.stringify(v)).setMimeType(ContentService.MimeType.JSON);}

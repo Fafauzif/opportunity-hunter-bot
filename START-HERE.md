@@ -84,7 +84,7 @@ Checkpoint: all required secret **names** appear in GitHub. You do not need to r
 
 Replace the existing bot file; do **not** leave the old bot code beside a second copy with the same functions/constants. If your project has unrelated scripts, leave those alone. Do not paste `tests/apps_script_test.js` into Apps Script.
 
-Checkpoint: the top of the new bot script says **2.0.2**. Existing Script Properties, including `WEBHOOK_SECRET`, remain intact. Do not rotate or recreate that secret.
+Checkpoint: the top of the new bot script says **2.1.0**. Existing Script Properties, including `WEBHOOK_SECRET`, remain intact. Do not rotate or recreate that secret.
 
 ## 5. Run the sheet upgrade once
 
@@ -104,7 +104,7 @@ The upgrade will:
 - Add **Details**, **My Applications**, background processing tables and reference checks.
 - Update expired deadline labels and initialize scheduled source revisits.
 
-Checkpoint: category tabs appear, **Settings → Backup before upgrade** contains a backup URL, and you can open an opportunity's Details. Original data is available through **Opportunity Hunter → Show background data**.
+Checkpoint: All Opportunities and the category tabs appear, **Settings → Backup before upgrade** contains a backup URL, and the info sidebar opens beside a selected row. Original data is available through **Opportunity Hunter → Show background data**.
 
 The upgrade is designed to be rerunnable. If the execution timed out, check for the backup URL in Apps Script Project Settings → Script Properties (`V2_BACKUP_URL`), then rerun the same function. Do not delete data to make it succeed. If it reports a conflicting unowned sheet name, rename that existing user tab rather than deleting it, then rerun.
 
@@ -121,7 +121,7 @@ Saving code is **not** the same as updating the bot's `/exec` deployment.
 
 The URL should stay the same because you edited the existing deployment. **Do not click New deployment** unless you intentionally want to change the webhook URL and update the matching GitHub secret.
 
-Checkpoint: opening your existing `/exec` URL in a browser shows JSON including `"version":"2.0.2"` and `"schema_version":2`. It does not expose your spreadsheet data or secret.
+Checkpoint: opening your existing `/exec` URL in a browser shows JSON including `"version":"2.1.0"` and `"schema_version":2`. It does not expose your spreadsheet data or secret.
 
 ## 7. Run verification
 
@@ -147,16 +147,16 @@ The initial monitor queue includes old accepted and rejected competition sources
 
 ## Everyday use
 
-- Browse the category tabs. Their rows are generated views; do not type personal notes into them.
-- Select an event row → **Opportunity Hunter → Open details for selected row**.
-- Clicking the **Open details** cell can also open Details after the sheet has been reloaded. If Google skips the selection trigger, the menu method is reliable.
+- Browse **All Opportunities** to skim every record, or use the separate category tabs. Their rows are generated views; do not type personal notes into them.
+- Select an event row → **Opportunity Hunter → Open info sidebar** for optional full evidence and rules beside the current sheet.
+- Select another row and click **Load selected row** in the sidebar to change the record. Selecting or clicking a category row no longer switches tabs.
 - To save an event, select its row → **Opportunity Hunter → Save selected opportunity**.
 - Edit your status, next action, personal due date, teammates, priority and notes in **My Applications**. Those rows are keyed by stable ID.
 - Do not replace or edit the hidden ID column in My Applications.
 - Use **Opportunity Hunter → Settings and run checks** to pause the bot, adjust costs, or edit your profile.
 - Use **Show background data** to inspect old/expired records, the queue, history, reference list or run logs. Refresh category views to put background data away again.
 
-In Details, the main deadline is the first actionable entry cutoff. Registration and submission dates remain separate. The sheet recalculates remaining days during refresh; that is different from a fresh check of the organizer's page.
+In the sidebar, the main deadline is the first actionable entry cutoff. Registration and submission dates remain separate. The sheet recalculates remaining days during refresh; that is different from a fresh check of the organizer's page. Existing v2 users install this browsing revision using [UPDATE-v2.1.0.md](UPDATE-v2.1.0.md), including one run of **refreshOpportunityViews**.
 
 ## Settings you can change without editing code
 

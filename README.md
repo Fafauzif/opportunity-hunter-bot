@@ -4,6 +4,15 @@ Competition-first discovery with Exa, Gemini extraction, selective OpenRouter re
 
 **Installing over v1? Open [START-HERE.md](START-HERE.md).** Keep the existing repository, spreadsheet, script properties and deployment URL. Do not reimport the workbook or create a second Apps Script project.
 
+## v2.1.0 browsing update
+
+Existing v2 users: follow [UPDATE-v2.1.0.md](UPDATE-v2.1.0.md). Paste the new `apps_script.gs`, save, run **refreshOpportunityViews** once, and redeploy the existing deployment as a new version. Reload the Sheet to refresh the menu. This rebuilds the live Google Sheet views from its saved data; the exported XLSX is not an installation target.
+
+- **All Opportunities** is the first tab and includes every saved record, with Category and Status filters. Actionable entries come first and closed/rejected history stays accessible below them.
+- Category tabs retain their separate lists and restore **What is this?**, including the stored explanation, fit context and benefits. Eligibility, fees, team requirements and deliverables are expanded directly in the row. Unknown costs remain explicitly unknown.
+- **Opportunity Hunter → Open info sidebar** opens full context beside the current sheet. Select another row and press **Load selected row** in the sidebar. No automatic tab switching or background polling is used. The HTML is embedded in the single `.gs` file; no extra Apps Script HTML file is needed.
+- My Applications keeps editable progress. The old Details tab remains in background data for compatibility; the new sidebar is the normal full-record viewer.
+
 ## v2.0.2 category refresh fix
 
 The category titles merge cells A:I, so freezing only column A splits those merged cells and Google Sheets rejects the refresh. Category refresh now clears frozen columns before rebuilding the merged banners and keeps the first three rows frozen. This also repairs an existing column freeze when refreshing. The offline emulator now enforces merged-cell freeze boundaries; the earlier emulator did not model that Google constraint.
@@ -14,7 +23,7 @@ This update includes the v2.0.1 queue date fix below. Existing v2 users only nee
 
 Native Sheets dates in `Bot Queue → Next Check` were compared using `String(date)` against an ISO date. That silently returned no due work while searches and connection verification still passed. Dates are now normalized before selection and sorting. The summary also excludes Programs when disabled, and reports processed event/listing/other pages plus due/waiting URL counts.
 
-For an existing v2 installation, update `bot_v2.py` and `hunter_core.py` in GitHub. Replace the existing Apps Script bot code with `apps_script.gs`, save, and edit the **existing deployment → New version → Deploy**. The `/exec` health response should report `version: 2.0.2`, `schema_version: 2`. No migration or queue reset is needed for this patch. Run `test`, then `full` after checking the report. Verification alone does not process the queue.
+The current package includes both fixes above. Its `/exec` health response should report `version: 2.1.0`, `schema_version: 2`. No database migration or queue reset is needed. For the browsing update, run **refreshOpportunityViews** once as described above. Verification alone does not process the queue.
 
 `Saved / updated` counts acknowledged event-record inserts/updates, including records kept for review or closed/rejected history. `New competitions` counts newly inserted active competition records. `Pending source URLs` counts enabled-family URLs due now or unprocessed/retry URLs waiting for a future date. It does not count future revisits of completed rows. Listing pages may add child URLs without saving an event. Coverage counts successful search requests, not events saved. Full mode still caps content attempts at 60 and Gemini calls at 30; supporting pages consume those same limits, so a backlog takes multiple runs and may grow while discovery continues.
 
@@ -35,6 +44,7 @@ Python 3.11+; standard library only:
 ```sh
 python -m unittest discover -s tests -v
 node tests/apps_script_test.js
+node tests/sidebar_client_test.js
 ```
 
 Node is needed only for offline Apps Script tests, not the deployed bot. The test emulator is not a substitute for native Sheets verification.
@@ -53,7 +63,7 @@ Node is needed only for offline Apps Script tests, not the deployed bot. The tes
 
 ## Data and navigation
 
-Nine-column category tabs draw from one background Opportunities table. Details presents full facts vertically. My Applications stores editable progress by stable opportunity ID. Queue, rotation cursor, notification claims and reviewer-cost reservations persist behind the scenes. Reused annual URLs can be revisited without permanently blocking new editions. Uncertain identity matches are kept separate rather than merged speculatively.
+Nine-column category tabs and an eleven-column All Opportunities overview draw from one background Opportunities table. The optional info sidebar presents full facts without leaving the selected sheet. My Applications stores editable progress by stable opportunity ID. Queue, rotation cursor, notification claims and reviewer-cost reservations persist behind the scenes. Reused annual URLs can be revisited without permanently blocking new editions. Uncertain identity matches are kept separate rather than merged speculatively.
 
 The upgrade backs up the existing spreadsheet once, preserves its webhook secret, reconciles legacy IDs, and migrates meaningful manual progress. It is rerunnable. Category views are regenerated; edit personal progress only in My Applications.
 

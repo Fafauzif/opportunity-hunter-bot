@@ -31,6 +31,9 @@ class Range {
   setWrap(){return this;}
   setFontWeight(){return this;}
   setBackground(){return this;}
+  setBackgrounds(rows){assert.equal(rows.length,this.nr);for(const row of rows)assert.equal(row.length,this.nc);return this;}
+  setFontSize(){return this;}
+  setVerticalAlignment(){return this;}
   setFontColor(){return this;}
   setNumberFormat(){return this;}
   setDataValidation(){return this;}
@@ -55,6 +58,7 @@ class Sheet {
   setFrozenColumns(n){for(const m of this.merges)assert(!(m.c<=n&&n<m.c+m.nc-1),'Cannot freeze part of a merged cell');this.frozenColumns=n;return this;}
   setColumnWidth(){return this;}
   setRowHeights(){return this;}
+  autoResizeRows(){return this;}
   setConditionalFormatRules(){return this;}
   setTabColor(){return this;}
   getFilter(){return this.filter;}
@@ -81,7 +85,8 @@ const workbook=new Workbook();
 const props={SPREADSHEET_ID:'test-sheet',WEBHOOK_SECRET:'test-webhook-secret'};
 const builder={whenDateBefore(){return this;},setBackground(){return this;},setRanges(){return this;},requireValueInList(){return this;},setAllowInvalid(){return this;},build(){return {};}};
 const sandbox={Date,JSON,Set,Map,console,Number,String,Array,Math,Object,RegExp,Error,
-  SpreadsheetApp:{getActiveSpreadsheet:()=>workbook,openById:()=>workbook,getUi:()=>({alert(){}}),ProtectionType:{SHEET:'SHEET'},newConditionalFormatRule:()=>Object.create(builder),newDataValidation:()=>Object.create(builder)},
+  SpreadsheetApp:{getActiveSpreadsheet:()=>workbook,openById:()=>workbook,getUi:()=>({alert(){},showSidebar(html){workbook.sidebar=html;}}),ProtectionType:{SHEET:'SHEET'},newConditionalFormatRule:()=>Object.create(builder),newDataValidation:()=>Object.create(builder)},
+  HtmlService:{createHtmlOutput:html=>({html,setTitle(title){this.title=title;return this;}})},
   LockService:{getScriptLock:()=>({waitLock(){},releaseLock(){}})},
   PropertiesService:{getScriptProperties:()=>({getProperty:k=>props[k]||null,setProperty(k,v){props[k]=String(v);},setProperties(o){Object.assign(props,o);}})},
   Utilities:{DigestAlgorithm:{SHA_256:'sha256'},Charset:{UTF_8:'utf8'},computeDigest:(_,v)=>[...crypto.createHash('sha256').update(String(v)).digest()],formatDate:(d,tz,fmt)=>{const iso=new Date(d.getTime()+7*3600000).toISOString();return fmt==='yyyy-MM-dd'?iso.slice(0,10):iso.slice(0,19).replace('T',' ');}},
@@ -148,7 +153,7 @@ const originalMain=workbook.getSheetByName('Opportunities'),beforeCount=original
 const originalTitles=call('v2Rows_',originalMain).map(r=>r.Title);
 check('full upgrade backs up before mutation and keeps webhook secret',()=>{
   call('upgradeOpportunityHunter');assert.equal(workbook.backups.length,1);assert.equal(props.WEBHOOK_SECRET,'test-webhook-secret');assert.equal(props.V2_SCHEMA,'2');
-  const health=JSON.parse(call('doGet').text);assert.equal(health.version,'2.0.2');assert.equal(health.schema_version,2);
+  const health=JSON.parse(call('doGet').text);assert.equal(health.version,'2.1.0');assert.equal(health.schema_version,2);
 });
 check('all main records and titles preserved',()=>{
   assert.equal(originalMain.getLastRow()-1,beforeCount);assert.equal(JSON.stringify(call('v2Rows_',originalMain).map(r=>r.Title)),JSON.stringify(originalTitles));
@@ -212,8 +217,8 @@ check('idempotent save does not duplicate rows',()=>{
 });
 check('notes stay attached to IDs after sorting category view',()=>{
   const s=call('v2ViewSheet_',workbook,'Business Cases');if(s.getLastRow()<4)return;
-  let id=s.notes['4,9'];
-  if(s.getLastRow()>4){id=s.notes['5,9'];[s.cells[3],s.cells[4]]=[s.cells[4],s.cells[3]];[s.notes['4,9'],s.notes['5,9']]=[s.notes['5,9'],s.notes['4,9']];}
+  let id=s.notes['4,1'];
+  if(s.getLastRow()>4){id=s.notes['5,1'];[s.cells[3],s.cells[4]]=[s.cells[4],s.cells[3]];[s.notes['4,1'],s.notes['5,1']]=[s.notes['5,1'],s.notes['4,1']];}
   s.selection=s.getRange(4,1);workbook.setActiveSheet(s);assert.equal(call('v2SelectedId_',workbook),id);
 });
 check('queue accepts native Sheets dates, serial dates and ISO text',()=>{
@@ -247,4 +252,53 @@ check('queue counts distinguish due work from retries and completed cooldowns',(
     const remaining=call('v2QueueStatus_',workbook);assert.equal(remaining.queue_due_now,1);assert.equal(remaining.queue_waiting,2);
   }finally{queue.cells=saved;}
 });
+check('all-opportunities view contains every stored ID with category and status',()=>{
+  const overview=call('v2ViewSheet_',workbook,'All Opportunities');
+  call('v2Refresh_',workbook);
+  const records=call('v2Rows_',originalMain),ids=records.map(r=>r['Opportunity ID']);
+  assert.equal(overview.getLastColumn(),11);assert.equal(overview.getLastRow()-3,records.length);
+  assert.equal(overview.getRange(3,2).getValue(),'Category');assert.equal(overview.getRange(3,3).getValue(),'Status');
+  assert.equal(overview.getRange(3,4).getValue(),'What is this?');
+  const shown=Array.from({length:records.length},(_,i)=>overview.getRange(i+4,1).getNote());
+  assert.deepEqual(new Set(shown),new Set(ids));assert.equal(workbook.sheets[0],overview);
+  for(let i=0;i<records.length;i++)assert(overview.getRange(i+4,3).getValue());
+});
+check('rich rows preserve descriptions, restrictions, deliverables and cost uncertainty',()=>{
+  const base={Title:'Rich view fixture','Opportunity ID':'rich-view-fixture','Primary Type':'Competition',Category:'Business Cases','Record Status':'ACTIVE','Alert Level':'REVIEW','Deadline Date':'2099-01-01','Eligibility Status':'Unclear','What Is This Opportunity?':'Create a student marketing proposal.','Why It May Matter':'Practice strategic marketing.','Prize / Benefits':'Mentoring.','Education Requirement':'Current undergraduate','Nationality Requirement':'Indonesia','University Requirement':'Indonesian university','Main Deliverable':'Ten-slide pitch','Application Requirements':'Two-person team','Rounds':'Remote qualifying, offline final','Individual / Team':'Team','Team Size':'2','Entry Fee Status':'Unknown','Total Entry Cost IDR':-1,'Estimated Personal Cost IDR':-1,Format:'Hybrid','Source URL':'https://example.org/rich'};
+  const n=originalMain.getLastRow();
+  try{
+    call('v2Append_',originalMain,base);call('refreshOpportunityViews');
+    const s=call('v2ViewSheet_',workbook,'Business Cases');const row=Object.entries(s.notes).find(([k,v])=>v===base['Opportunity ID'])[0].split(',')[0];
+    assert.equal(s.getRange(3,2).getValue(),'What is this?');assert(s.getRange(Number(row),2).getValue().includes(base['What Is This Opportunity?']));
+    assert(s.getRange(Number(row),4).getValue().includes('Indonesian university'));
+    assert(s.getRange(Number(row),7).getValue().includes('Entry cost unknown'));assert(s.getRange(Number(row),7).getValue().includes('Travel / personal costs unknown'));
+    assert(s.getRange(Number(row),8).getValue().includes('Ten-slide pitch'));assert(s.getRange(Number(row),9).getValue().startsWith('=HYPERLINK('));
+    assert(!call('v2CostText_',base).includes('Rp0'));
+    assert(call('v2CostText_',{'Total Entry Cost IDR':50000,'Entry Fee Status':'Free'}).includes('Rp50,000'));
+  }finally{originalMain.cells.length=n;call('v2Refresh_',workbook);}
+});
+check('actionable rows rank before review rows and closed history',()=>{
+  const highReview={'Match Score':100,'Eligibility Status':'Unclear','Deadline Date':'2099-01-01'};
+  const priority={'Alert Level':'PRIORITY','Deadline Date':'2099-01-01'};
+  const closed={'Alert Level':'PRIORITY','Record Status':'CLOSED','Deadline Date':'2099-01-01'};
+  assert(call('v2ActionTier_',priority)<call('v2ActionTier_',highReview));
+  assert(call('v2ActionTier_',highReview)<call('v2ActionTier_',closed));
+});
+check('sidebar opens without tab navigation and returns serializable selected-record fields',()=>{
+  const s=call('v2ViewSheet_',workbook,'All Opportunities');s.selection=s.getRange(4,4);workbook.setActiveSheet(s);
+  const selected=call('v2SelectedId_',workbook);const info=call('getSelectedOpportunityDetails');
+  assert.equal(info.id,selected);assert.equal(JSON.parse(JSON.stringify(info)).id,selected);
+  call('openSelectedDetails');assert.equal(workbook.getActiveSheet(),s);assert(workbook.sidebar.html.includes('Load selected row'));
+  assert.equal(typeof sandbox.onSelectionChange,'undefined');
+  const apps=call('v2ViewSheet_',workbook,'My Applications');
+  if(apps.getLastRow()>1){apps.selection=apps.getRange(2,3);workbook.setActiveSheet(apps);assert.equal(call('getSelectedOpportunityDetails').id,apps.getRange(2,1).getValue());}
+  s.selection=s.getRange(3,1);workbook.setActiveSheet(s);assert.throws(()=>call('getSelectedOpportunityDetails'),/Select a data row/);
+});
+check('legacy category selections remain readable before the first refresh',()=>{
+  const s=call('v2ViewSheet_',workbook,'Business Cases'),oldHeader=s.getRange(3,2).getValue(),notes={...s.notes};
+  try{s.getRange(3,2).setValue('Entry Deadline');s.getRange(4,9).setNotes([['legacy-selected-id']]);s.selection=s.getRange(4,2);workbook.setActiveSheet(s);assert.equal(call('v2SelectedId_',workbook),'legacy-selected-id');}
+  finally{s.getRange(3,2).setValue(oldHeader);s.notes=notes;}
+});
+const previewArg=process.argv.indexOf('--sidebar-preview');
+if(previewArg>=0)fs.writeFileSync(process.argv[previewArg+1],call('v2SidebarHTML_'));
 console.log(JSON.stringify({checks,original_opportunities:beforeCount,migration:'passed in offline emulator',native_google_ui:'not executed'}));

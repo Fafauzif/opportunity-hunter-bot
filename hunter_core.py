@@ -9,7 +9,7 @@ from collections import defaultdict, deque
 from datetime import date
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
-VERSION = "2.0.2"
+VERSION = "2.1.0"
 CATEGORIES = ["Business Cases", "Marketing", "Essays & Policy", "Pitch & Innovation", "Speaking & Debate", "Programs"]
 QUERY_BANK = {
     "Business Cases": ["student business case competition registration {year}", "lomba business case mahasiswa pendaftaran {year}", "consulting strategy case competition undergraduate", "international business case competition {next_year}"],
